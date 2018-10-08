@@ -47,7 +47,7 @@ class xfjy(CrawlSpider):
         position = response.xpath("string(//div[@class='weizhi']//td)").extract_first()
         position = "".join(position.split()).split(">>")
         position[0] = "先锋家园"
-        position = "--".join(position)
+
 
         # 解析出文章title，date，url，并且进行文章爬取
         tr_tags = response.xpath("//div[@class='main_nei_you_baio_content']//tr[@height='20']")

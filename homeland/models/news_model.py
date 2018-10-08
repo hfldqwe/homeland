@@ -29,8 +29,8 @@ class YibanModel():
 
     def insert(self,source_type,block_type,title,create_time,author,attachment,content,spider_time):
         content = pymysql.escape_string(content)
-        # 检查title是否已经有了，有了的话就抛弃这篇新闻
-        sqlagr = "select id from fa_school_news where title='{}' and create_time='{}';".format(title,create_time)
+        # 检查title和time是否已经有了，有了的话就抛弃这篇新闻
+        sqlagr = "select id from fa_school_news where title='{}' and create_time='{}' and block_type='{}';".format(title,create_time,block_type)
         row = self.cursor.execute(sqlagr)
         if row != 0:
             return None

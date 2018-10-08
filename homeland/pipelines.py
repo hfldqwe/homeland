@@ -26,11 +26,12 @@ class HomelandPipeline(object):
 
         spider_time = int(time.time())
         source_type = "xfjy"
-        block_type = item["position"]
+        block_types = item["position"]
         title = item["title"]
         create_time = item["detail_time"]
         author = item["author"]
         attachment = item["attch_name_url"]
         content = item["content"]
 
-        self.yiban.insert(source_type,block_type,title,create_time,author,attachment,content,spider_time)
+        for block_type in block_types:
+            self.yiban.insert(source_type,block_type,title,create_time,author,attachment,content,spider_time)

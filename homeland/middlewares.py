@@ -23,10 +23,8 @@ class FilterRequestsMiddleware(object):
 
     def process_request(self,request,spider):
         if request.meta.get("forbid",None):
-            passed = self.filter_url.filter(request.url)
-            if passed:
-                return None
-            else:
+            exist = self.filter_url.filter(request.url)
+            if exist:
                 raise IgnoreRequest("ignore request: %s" % request.url)
         return None
 

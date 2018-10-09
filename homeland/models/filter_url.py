@@ -22,14 +22,13 @@ class FilterUrl():
 
     def filter(self,url):
         '''
-        用来过滤url，返回0则应该舍弃，返回1则正常访问
+        用来过滤url，如果没有，exist为None
         '''
         exist = self.re.sismember(self.name,url)
-        if exist:
-            return 0
-        else:
-            self.re.sadd(self.name,url)
-            return 1
+        return exist
+
+    def add(self,url):
+        self.re.sadd(self.name,url)
 
     def test(self):
         print(self.filter("1"))

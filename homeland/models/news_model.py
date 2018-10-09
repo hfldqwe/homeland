@@ -28,7 +28,7 @@ class YibanModel():
     spider_time —— 爬取的时间
     '''
     def __init__(self):
-        host, port, username, password, db = mysql_conf("mysql_235")
+        host, port, username, password, db = mysql_conf("mysql_test")
         self.con = pymysql.connect(
             host = host,
             port = port,

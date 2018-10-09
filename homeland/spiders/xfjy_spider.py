@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import scrapy
+from scrapy.crawler import CrawlerProcess
 import time
 import json
 import logging
@@ -190,6 +191,10 @@ class xfjy(CrawlSpider):
     #
     #         yield scrapy.Request(url,meta={"title":title,"date":date,"position":position},callback=self.parse_article,dont_filter=True)
 
+if __name__ == '__main__':
+    process = CrawlerProcess()
+    process.crawl(xfjy)
+    process.start()
 
 
 

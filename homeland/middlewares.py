@@ -26,7 +26,8 @@ class FilterRequestsMiddleware(object):
             exist = self.filter_url.filter(request.url)
             if exist:
                 raise IgnoreRequest("ignore request: %s" % request.url)
-        return None
+            else:
+                return None
 
 
 class HomelandSpiderMiddleware(object):

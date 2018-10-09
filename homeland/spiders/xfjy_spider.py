@@ -8,6 +8,7 @@ import logging
 from scrapy.spiders import CrawlSpider,Rule
 from scrapy.linkextractors import LinkExtractor
 from ..items import HomelandItem
+import re
 
 class xfjy(CrawlSpider):
     name = "xfjy"
@@ -34,7 +35,8 @@ class xfjy(CrawlSpider):
 
     def parse_index(self, response):
         url = response.urljoin(response.url)
-        yield scrapy.Request(url=url,callback=self.parse_item,dont_filter=True)
+        if url != "http://xfjy.chd.edu.cn/":
+            yield scrapy.Request(url=url,callback=self.parse_item,dont_filter=True)
 
     def parse_item(self, response):
         '''
@@ -42,15 +44,16 @@ class xfjy(CrawlSpider):
         :param response:
         :return:position,title_dates
         '''
+        amount_item = response.meta.get("amount_item",0)
 
         # 将位置（板块名称）进行解析组合成为我们需要的名称
         position = response.xpath("string(//div[@class='weizhi']//td)").extract_first()
         position = "".join(position.split()).split(">>")
         position[0] = "先锋家园"
 
-
         # 解析出文章title，date，url，并且进行文章爬取
         tr_tags = response.xpath("//div[@class='main_nei_you_baio_content']//tr[@height='20']")
+        amount_item += len(tr_tags)
         for tr_tag in tr_tags:
             # 提取文章的url,并且拼接为完整的链接
             url = tr_tag.xpath(".//a//@href").extract_first()
@@ -80,7 +83,18 @@ class xfjy(CrawlSpider):
         next_url = response.css(".Next::attr(href)").extract_first()
         if next_url:
             next_url = response.urljoin(next_url)
-            yield scrapy.Request(next_url,callback=self.parse_item)
+            yield scrapy.Request(next_url,callback=self.parse_item,meta={"amount_item":amount_item})
+        else:
+            # 解析当前版块的文章条数
+            try:
+                amount = response.xpath(
+                    "//div[@class='main_nei_you_baio_content']//td[@id='fanye44007']//text()").extract_first()
+                amount = re.compile("共(.*?)条").findall(amount)[0]
+            except:
+                amount = 0
+            if int(amount_item) != int(amount):
+                self.log("爬取数量不对应，版块链接：{}，应爬：{} / 实爬：{}".format(response.url,amount,amount_item),level=logging.ERROR)
+
 
     def parse_article(self, response):
         item = HomelandItem()

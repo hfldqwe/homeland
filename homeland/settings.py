@@ -19,6 +19,7 @@ NEWSPIDER_MODULE = 'homeland.spiders'
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'homeland (+http://www.yourdomain.com)'
+# USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36 (+http://ids.chd.edu.cn/authserver/login)'
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
@@ -41,10 +42,11 @@ CONCURRENT_REQUESTS = 32
 #TELNETCONSOLE_ENABLED = False
 
 # Override the default request headers:
-#DEFAULT_REQUEST_HEADERS = {
-#   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-#   'Accept-Language': 'en',
-#}
+DEFAULT_REQUEST_HEADERS = {
+   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+   'Accept-Language': 'en',
+    'User-Agent':'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36',
+}
 
 # Enable or disable spider middlewares
 # See https://doc.scrapy.org/en/latest/topics/spider-middleware.html
@@ -93,10 +95,10 @@ ITEM_PIPELINES = {
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
 # config log file
-today = datetime.datetime.now()
-log_file_path = "log/scrapy-{}-{}-{}-{}-{}.log".format(today.year,today.month,today.day,today.hour,today.minute)
-LOG_ENABLED=True
-LOG_ENCODING='utf-8'
-LOG_FILE = log_file_path
-LOG_LEVEL = "WARNING"
-LOG_STDOUT = True
+# today = datetime.datetime.now()
+# log_file_path = "/home/py/project/homeland/log/scrapy-{}-{}-{}-{}-{}.log".format(today.year,today.month,today.day,today.hour,today.minute)
+# LOG_ENABLED=True
+# LOG_ENCODING='utf-8'
+# LOG_FILE = log_file_path
+# LOG_LEVEL = "WARNING"
+# LOG_STDOUT = True

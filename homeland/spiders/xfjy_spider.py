@@ -147,6 +147,7 @@ class xfjy(CrawlSpider):
         字段名对应的item字段名
         spider_time = int(time.time())
         source_type = "xfjy"
+
         block_type = item["position"]
         title = item["title"]
         create_time = item["detail_time"]

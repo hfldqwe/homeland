@@ -81,10 +81,13 @@ class YibanModel():
         if row != 0:
             type_id, archives, nums = self.cursor.fetchone()
             if type_id:
-                archives = archives + "," + str(id)
-                nums = int(nums) + 1
-                row = self.cursor.execute("update fa_cms_tags set archives='{}',nums={} where id={};".format(archives, nums, type_id))
-                self.con.commit()
+                archives_set = set(archives.split(","))
+                # 判断这个id是否在archives中，若存在，则不添加，若不存在，则添加
+                if str(id) not in archives_set:
+                    archives = archives + "," + str(id)
+                    nums = int(nums) + 1
+                    row = self.cursor.execute("update fa_cms_tags set archives='{}',nums={} where id={};".format(archives, nums, type_id))
+                    self.con.commit()
         else:
             self.cursor.execute(
                 "insert into fa_cms_tags (`name`,archives,nums) value ('{}','{}',{});".format(block_type, id, 1))

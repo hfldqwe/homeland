@@ -15,10 +15,10 @@ def redis_conf(section):
 
 
 class FilterUrl():
-    def __init__(self):
+    def __init__(self,name):
         host,port,password,db = redis_conf("redis_local")
         self.re = redis.Redis(host=host,port=port,password=password,db=db)
-        self.name = "xfjy_article_url"
+        self.name = name
 
     def filter(self,url):
         '''

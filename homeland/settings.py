@@ -10,6 +10,7 @@
 #     https://doc.scrapy.org/en/latest/topics/spider-middleware.html
 
 import datetime
+import os
 
 BOT_NAME = 'homeland'
 
@@ -94,11 +95,14 @@ ITEM_PIPELINES = {
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
+# 配置最大线程数量：
+REACTOR_THREADPOOL_MAXSIZE = 20
+
 # config log file
-# today = datetime.datetime.now()
-# log_file_path = "/home/py/project/homeland/log/scrapy-{}-{}-{}-{}-{}.log".format(today.year,today.month,today.day,today.hour,today.minute)
-# LOG_ENABLED=True
-# LOG_ENCODING='utf-8'
-# LOG_FILE = log_file_path
-# LOG_LEVEL = "WARNING"
-# LOG_STDOUT = True
+today = datetime.datetime.now()
+log_file_path = "/home/py/project/homeland/log/scrapy-{}-{}-{}-{}-{}.log".format(today.year,today.month,today.day,today.hour,today.minute)
+LOG_ENABLED=True
+LOG_ENCODING='utf-8'
+LOG_FILE = log_file_path
+LOG_LEVEL = "WARNING"
+LOG_STDOUT = True

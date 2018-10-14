@@ -10,7 +10,7 @@ from scrapy.linkextractors import LinkExtractor
 from ..items import HomelandItem
 import re
 
-class xfjy(CrawlSpider):
+class XfjySpider(CrawlSpider):
     name = "xfjy"
     allowed_demains = ["chd.edu.cn"]
     start_urls = ["http://xfjy.chd.edu.cn/"]

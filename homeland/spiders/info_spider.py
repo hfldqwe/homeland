@@ -14,9 +14,9 @@ from ..items import HomelandItem
 USERNAME = '2017905714'
 PASSWORD = '100818'
 
-class InfoSpiderSpider(scrapy.Spider):
+class InfoSpider(scrapy.Spider):
     name = 'info_spider'
-    allowed_domains = ['chd.edu.cn']
+    allowed_domains = ['http://portal.chd.edu.cn','http://ids.chd.edu.cn']
     start_urls = ['http://ids.chd.edu.cn/authserver/login?service=http%3A%2F%2Fportal.chd.edu.cn%2F']
 
     def parse(self, response):
@@ -53,7 +53,7 @@ class InfoSpiderSpider(scrapy.Spider):
             article_urls = response.xpath("//ul[@class='rss-container clearFix']//li//a[@class='rss-title']//@href").extract()
             for article_url in article_urls:
                 article_url = response.urljoin(article_url)
-                yield Request(article_url,callback=self.parse_article)
+                yield Request(article_url,callback=self.parse_article,meta={"forbid":True})
 
             # 一下部分用于爬取下一页
             # 获取新闻总数和页数
@@ -83,7 +83,7 @@ class InfoSpiderSpider(scrapy.Spider):
         info = response.xpath("//div[@class='bulletin-info']")
         info_text = info.extract_first()
         author = info.xpath(".//span//text()").extract_first()
-        block_type = re.compile("发布部门：(.*?) <").findall(info_text)[0]
+        block_type = [re.compile("发布部门：(.*?) <").findall(info_text)[0],]
         creat_time = re.compile("发布时间：(.*?)\r\n").findall(info_text)[0]
         creat_time = int(time.mktime(time.strptime(creat_time,'%Y年%m月%d日 %H:%M')))
 
@@ -102,6 +102,8 @@ class InfoSpiderSpider(scrapy.Spider):
         item["content"] = content
         item["detail_time"] = creat_time
         item["article_url"] = response.url
+
+        yield item
 
 
 

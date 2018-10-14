@@ -9,6 +9,9 @@ from scrapy import signals
 from .models.filter_url import FilterUrl
 from scrapy.exceptions import IgnoreRequest
 
+from .spiders.info_spider import InfoSpider
+from .spiders.xfjy_spider import XfjySpider
+
 
 class FilterRequestsMiddleware(object):
     @classmethod
@@ -19,7 +22,11 @@ class FilterRequestsMiddleware(object):
         return s
 
     def spider_opened(self, spider):
-        self.filter_url = FilterUrl()
+        if isinstance(spider,InfoSpider):
+            name = "info_article_url"
+        if isinstance(spider,XfjySpider):
+            name = "xfjy_article_url"
+        self.filter_url = FilterUrl(name)
 
     def process_request(self,request,spider):
         if request.meta.get("forbid",None):

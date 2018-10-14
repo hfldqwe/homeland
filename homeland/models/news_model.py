@@ -46,6 +46,7 @@ class YibanModel():
         :param block_type: 版块
         :return: 已经存在就返回1（True）
         '''
+        title = pymysql.escape_string(title)
         sqlagr = "select id from fa_school_news where title='{}' and create_time='{}' and block_type='{}';".format(
             title, create_time, block_type)
         rows = self.cursor.execute(sqlagr)
@@ -56,6 +57,7 @@ class YibanModel():
         ''' 插入数据库 '''
         if len(title)>=200:
             title = title[0:200]
+        title = pymysql.escape_string(title)
         content = pymysql.escape_string(content)
         sqlagr = '''INSERT INTO fa_school_news(source_type,block_type,title,create_time,author,attachment,content,spider_time,remark,views,likes,status) VALUE('{}','{}','{}','{}','{}','{}',"{}",'{}','{}',{},{},{});'''.format(
             source_type, block_type, title, create_time, author, attachment, content, spider_time, "", "0", "0", "1")
@@ -66,6 +68,7 @@ class YibanModel():
 
     def id_news(self,title, create_time,block_type):
         ''' 查询这条数据的id '''
+        title = pymysql.escape_string(title)
         self.cursor.execute(
             "SELECT id FROM fa_school_news where title='{}' and create_time='{}' and block_type='{}';".format(title, create_time,block_type))
         id = self.cursor.fetchone()[0]

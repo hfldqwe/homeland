@@ -16,7 +16,7 @@ PASSWORD = '100818'
 
 class InfoSpider(scrapy.Spider):
     name = 'info_spider'
-    allowed_domains = ['http://portal.chd.edu.cn','http://ids.chd.edu.cn']
+    allowed_domains = ['portal.chd.edu.cn','ids.chd.edu.cn']
     start_urls = ['http://ids.chd.edu.cn/authserver/login?service=http%3A%2F%2Fportal.chd.edu.cn%2F']
 
     def parse(self, response):

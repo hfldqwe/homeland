@@ -11,13 +11,16 @@ from scrapy.shell import inspect_response
 from ..items import HomelandItem
 
 
-USERNAME = '2017905714'
-PASSWORD = '100818'
-
 class InfoSpider(scrapy.Spider):
-    name = 'info_spider'
+    name = 'info'
     allowed_domains = ['portal.chd.edu.cn','ids.chd.edu.cn']
     start_urls = ['http://ids.chd.edu.cn/authserver/login?service=http%3A%2F%2Fportal.chd.edu.cn%2F']
+
+    def __init__(self,username,password,source_type,*args,**kwargs):
+        super(InfoSpider,self).__init__(*args,**kwargs)
+        self.username = username
+        self.password = password
+        self.source_type = source_type
 
     def parse(self, response):
         lt = response.xpath("//input[@name='lt']//@value").extract_first()
@@ -28,14 +31,14 @@ class InfoSpider(scrapy.Spider):
         btn = ""
 
         formdata = {
-            "username":USERNAME,
-            "password":PASSWORD,
+            "username":self.username,
+            "password":self.password,
             "lt":lt,
             "dllt":dllt,
             "execution":execution,
             "_eventId":_eventId,
             "rmShown":rmShown,
-            "btn":"",
+            "btn":btn,
         }
         yield FormRequest("http://ids.chd.edu.cn/authserver/login?service=http%3A%2F%2Fportal.chd.edu.cn%2F",
                           formdata = formdata,

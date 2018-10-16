@@ -18,10 +18,9 @@ from scrapy.exceptions import CloseSpider
 class HomelandPipeline(object):
     def open_spider(self,spider):
         self.logger = logging.getLogger()
-        print(isinstance(spider, InfoSpider))
         if isinstance(spider,InfoSpider):
             name = "info_article_url"
-            self.source_type = "info"
+            self.source_type = spider.source_type
         elif isinstance(spider,XfjySpider):
             name = "xfjy_article_url"
             self.source_type = "xfjy"

@@ -96,7 +96,7 @@ ITEM_PIPELINES = {
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
 # 配置最大线程数量：
-REACTOR_THREADPOOL_MAXSIZE = 20
+REACTOR_THREADPOOL_MAXSIZE = 50
 
 # config log file
 today = datetime.datetime.now()

@@ -2,3 +2,4 @@
 .git
 /homeland/info.conf
 .idea/
+.log/

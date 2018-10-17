@@ -7,9 +7,7 @@ import logging
 import json
 import time
 
-from scrapy.shell import inspect_response
 from ..items import HomelandItem
-
 
 class InfoSpider(scrapy.Spider):
     name = 'info'
@@ -43,39 +41,37 @@ class InfoSpider(scrapy.Spider):
         yield FormRequest("http://ids.chd.edu.cn/authserver/login?service=http%3A%2F%2Fportal.chd.edu.cn%2F",
                           formdata = formdata,
                           callback=self.spider_news,
-                          meta={'pageIndex':1},
+                          meta={'pageIndex':0},
                           )
 
     def spider_news(self,response):
         pageIndex = response.meta.get("pageIndex",None)
-        if pageIndex:
-            url = "http://portal.chd.edu.cn/detach.portal?pageIndex={}&pageSize=&.pmn=view&.ia=false&action=bulletinsMoreView&search=true&groupid=all&.pen=pe65".format(pageIndex)
-            # cookiejar = reqponse.headers.getlist('Set-Cookie')
+        next_url = "http://portal.chd.edu.cn/detach.portal?pageIndex={}&pageSize=&.pmn=view&.ia=false&action=bulletinsMoreView&search=true&groupid=all&.pen=pe65".format(
+            pageIndex + 1)
 
-            # 这部分用于提取news的链接并且进行爬取
-            article_urls = response.xpath("//ul[@class='rss-container clearFix']//li//a[@class='rss-title']//@href").extract()
-            for article_url in article_urls:
-                article_url = response.urljoin(article_url)
-                yield Request(article_url,callback=self.parse_article,meta={"forbid":True})
-
-            # 一下部分用于爬取下一页
-            # 获取新闻总数和页数
+        if pageIndex == 0:
+            yield Request(next_url,callback=self.spider_news,meta={'pageIndex':1})
+        else:
             info = response.xpath("//div[@class='pagination-info clearFix']//span//text()").extract_first()
             if info:
                 info = re.compile("\d*/\d*").findall(info)[0]
                 news_amount, page_amount = info.split("/")
             else:
                 self.log("没有找到文章数和页数，版块链接：%s" % response.url,level=logging.ERROR)
-                page_amount = int(pageIndex) + 1
+                yield
 
-            if int(pageIndex) < int(page_amount):
-                pageIndex = int(pageIndex) + 1
-                yield Request(url,callback=self.spider_news,meta={"pageIndex":pageIndex})
+            if int(page_amount)> pageIndex:
+                pageIndex += 1
+                yield Request(next_url,callback=self.spider_news,meta={'pageIndex':pageIndex})
             else:
-                self.log("爬取完毕，总页数：{}，终止页数：{}".format(page_amount,pageIndex))
+                self.log("先锋家园爬取结束，爬取页数{}".format(pageIndex),level=logging.WARNING)
 
-        else:
-            self.log("没有获取到页数，当前页面链接：%s" % response.url,level=logging.ERROR)
+            # 这部分用于提取news的链接并且进行爬取
+            article_urls = response.xpath(
+                "//ul[@class='rss-container clearFix']//li//a[@class='rss-title']//@href").extract()
+            for article_url in article_urls:
+                article_url = response.urljoin(article_url)
+                yield Request(article_url, callback=self.parse_article, meta={"forbid": True})
 
     def parse_article(self,response):
         item = HomelandItem()

@@ -56,15 +56,16 @@ class InfoSpider(scrapy.Spider):
             if info:
                 info = re.compile("\d*/\d*").findall(info)[0]
                 news_amount, page_amount = info.split("/")
+
+                if int(page_amount) > pageIndex:
+                    pageIndex += 1
+                    yield Request(next_url, callback=self.spider_news, meta={'pageIndex': pageIndex})
+                else:
+                    self.log("先锋家园爬取结束，爬取页数{}".format(pageIndex), level=logging.WARNING)
+
             else:
                 self.log("没有找到文章数和页数，版块链接：%s" % response.url,level=logging.ERROR)
                 yield
-
-            if int(page_amount)> pageIndex:
-                pageIndex += 1
-                yield Request(next_url,callback=self.spider_news,meta={'pageIndex':pageIndex})
-            else:
-                self.log("先锋家园爬取结束，爬取页数{}".format(pageIndex),level=logging.WARNING)
 
             # 这部分用于提取news的链接并且进行爬取
             article_urls = response.xpath(

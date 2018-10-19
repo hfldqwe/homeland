@@ -11,6 +11,7 @@ import logging
 
 from .spiders.info_spider import InfoSpider
 from .spiders.xfjy_spider import XfjySpider
+from .spiders.official_spider import OfficialSpider
 
 from scrapy.exceptions import CloseSpider
 
@@ -24,9 +25,12 @@ class HomelandPipeline(object):
         elif isinstance(spider,XfjySpider):
             name = "xfjy_article_url"
             self.source_type = "xfjy"
+        elif isinstance(spider,OfficialSpider):
+            name = "official_artical_url"
+            self.source_type = "official"
         else:
-            self.logger.error("没有找到启动的爬虫，%s" % spider.__class__)
-            raise CloseSpider("没有找到启动的爬虫，%s" % spider.__class__)
+            self.logger.error("没有找到启动的爬虫,pipelines无法加载，%s" % spider.__class__)
+            raise CloseSpider("没有找到启动的爬虫,pipelines无法加载，%s" % spider.__class__)
 
         self.yiban = YibanModel()
         self.filter_url = FilterUrl(name)

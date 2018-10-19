@@ -2,6 +2,7 @@ from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
 from homeland.spiders.xfjy_spider import XfjySpider
 from homeland.spiders.info_spider import InfoSpider
+from homeland.spiders.official_spider import OfficialSpider
 from configparser import ConfigParser
 
 config = ConfigParser()
@@ -25,5 +26,6 @@ if __name__ == '__main__':
     teacher_username,teacher_password,teacher_type = read_user("teacher_user")
     process.crawl(InfoSpider,username = student_username,password=student_password,source_type=student_type)
     process.crawl(InfoSpider,username = teacher_username,password=teacher_password,source_type=teacher_type)
+    process.crawl(OfficialSpider)
     process.start()
 

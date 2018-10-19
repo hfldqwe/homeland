@@ -7,10 +7,11 @@
 
 from scrapy import signals
 from .models.filter_url import FilterUrl
-from scrapy.exceptions import IgnoreRequest
+from scrapy.exceptions import IgnoreRequest,CloseSpider
 
 from .spiders.info_spider import InfoSpider
 from .spiders.xfjy_spider import XfjySpider
+from .spiders.official_spider import OfficialSpider
 
 
 class FilterRequestsMiddleware(object):
@@ -24,8 +25,13 @@ class FilterRequestsMiddleware(object):
     def spider_opened(self, spider):
         if isinstance(spider,InfoSpider):
             name = "info_article_url"
-        if isinstance(spider,XfjySpider):
+        elif isinstance(spider,XfjySpider):
             name = "xfjy_article_url"
+        elif isinstance(spider,OfficialSpider):
+            name = "official_artical_url"
+        else:
+            spider.log("没有找到启动的爬虫,pipelines无法加载，%s" % spider.__class__)
+            raise CloseSpider("没有找到启动的爬虫,pipelines无法加载，%s" % spider.__class__)
         self.filter_url = FilterUrl(name)
 
     def process_request(self,request,spider):

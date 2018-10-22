@@ -1,4 +1,5 @@
 import pymysql
+import logging
 from configparser import ConfigParser
 
 
@@ -16,17 +17,6 @@ def mysql_conf(section):
         raise Exception("读取mysql配置出现错误")
 
 class YibanModel():
-    '''
-    用来说明参数的意义：
-    source_type —— 这个是news，最基本的一个类型说明
-    block_type —— 这个是版块的类型，如：先锋家园，地测等等，而且一个文章可以有多个标签
-    title —— 标题
-    create_time —— 爬取文章的发布时间
-    author —— 作者
-    attachment —— 附件以及地址
-    content —— 文章内容
-    spider_time —— 爬取的时间
-    '''
     def __init__(self):
         host, port, username, password, db = mysql_conf("mysql_test")
         self.con = pymysql.connect(
@@ -37,64 +27,83 @@ class YibanModel():
             db = db,
         )
         self.cursor = self.con.cursor()
+        self.logger = logging.getLogger()
 
-    def filder_news(self,title,create_time,block_type):
+    def filder_archives(self,article_url,title,publishtime,tags,*args,**kwargs):
         '''
-        用来过滤掉重复的参数，判断依据是：title，create_time，block_type
+        用来过滤掉重复的参数，判断依据是：title，publish_time，tags
         :param title: 标题
-        :param create_time: 文章发布时间
-        :param block_type: 版块
+        :param publish_time: 文章发布时间
+        :param tags: 版块
         :return: 已经存在就返回1（True）
         '''
         title = pymysql.escape_string(title)
-        sqlagr = "select id from fa_school_news where title='{}' and create_time='{}' and block_type='{}';".format(
-            title, create_time, block_type)
+        sqlagr = "select id from fa_cms_archives where title='{}' and publishtime='{}' and tags='{}';".format(
+            title, publishtime, tags)
         rows = self.cursor.execute(sqlagr)
-        if rows != 0:
+        if rows >= 1:
+            self.logger.error("archives表中数据已存在，文章链接：{}".format(article_url))
             return 1
+        return 0
 
-    def insert_news(self,source_type, block_type, title, create_time, author, attachment, content, spider_time):
+    def insert_archives(self,article_url,channel_id,model_id,title,flag,image,attachfile,keywords,description,tags,weigh,views,comments,likes,dislikes,diyname,createtime,publishtime,status,power,*args,**kwargs):
         ''' 插入数据库 '''
         if len(title)>=200:
             title = title[0:200]
         title = pymysql.escape_string(title)
-        content = pymysql.escape_string(content)
-        sqlagr = '''INSERT INTO fa_school_news(source_type,block_type,title,create_time,author,attachment,content,spider_time,remark,views,likes,status) VALUE('{}','{}','{}','{}','{}','{}',"{}",'{}','{}',{},{},{});'''.format(
-            source_type, block_type, title, create_time, author, attachment, content, spider_time, "", "0", "0", "1")
+        image = pymysql.escape_string(image)
+        sqlagr = '''INSERT INTO fa_cms_archives set `channel_id`="{}",`model_id`="{}",`title`="{}",`flag`="{}",`image`="{}",`attachfile`="{}",`keywords`="{}",`description`="{}",`tags`="{}",`weigh`="{}",`views`="{}",`comments`="{}",`likes`="{}",`dislikes`="{}",`diyname`="{}",`createtime`="{}",`publishtime`="{}",`status`="{}",`power`="{}";'''.format(
+            channel_id, model_id, title, flag, image, attachfile, keywords, description, tags, weigh, views, comments, likes,dislikes, diyname, createtime, publishtime, status, power)
         rows = self.cursor.execute(sqlagr)
         self.con.commit()
         if rows<1:
-            return "插入数据库错误"
+            self.logger.error("插入archives表错误：插入失败，文章链接：{}".format(article_url))
+            return False
+        return True
 
-    def id_news(self,title, create_time,block_type):
+    def filder_addonnews(self,id):
+        ''' 用来判断数据库中fa_cms_addonnews表是否会出现错误 '''
+        ''' 返回为 1，则数据已存在 '''
+        sqlagr = "select id from fa_cms_addonnews where id={};".format(id)
+        rows = self.cursor.execute(sqlagr)
+        if rows >= 1:
+            self.logger.error("addonnews表内容已存在错误：内容表中数据已存在，id={}".format(id))
+            return 1
+        return 0
+
+    def insert_addonnews(self,id,content,author,style,*args,**kwargs):
+        ''' 插入fa_cms_addonnews表 '''
+        content = pymysql.escape_string(content)
+        author = pymysql.escape_string(author)
+
+        sqlagr = 'insert into fa_cms_addonnews(id,content,author,style) values ("{}","{}","{}","{}");'.format(id,content,author,style)
+        row = self.cursor.execute(sqlagr)
+        self.con.commit()
+        if row<1:
+            self.logger.error("插入addonnews表失败，文章id={}".format(id))
+            return False
+        return True
+
+    def id_archives(self,title, publishtime, tags,*args,**kwargs):
         ''' 查询这条数据的id '''
         title = pymysql.escape_string(title)
         self.cursor.execute(
-            "SELECT id FROM fa_school_news where title='{}' and create_time='{}' and block_type='{}';".format(title, create_time,block_type))
+            "select id from fa_cms_archives where title='{}' and publishtime='{}' and tags='{}';".format(title, publishtime, tags))
         id = self.cursor.fetchone()[0]
         return id
 
-    def tags(self,block_type,id):
-        '''
-        判断tags是否存在，存在就直接修改，不存在就创建一个
-        :param block_type:
-        :return:
-        '''
-        row = self.cursor.execute("select id,archives,nums from fa_cms_tags where `name`='{}';".format(block_type))
-        if row != 0:
-            type_id, archives, nums = self.cursor.fetchone()
-            if type_id:
-                archives_set = set(archives.split(","))
-                # 判断这个id是否在archives中，若存在，则不添加，若不存在，则添加
-                if str(id) not in archives_set:
-                    archives = archives + "," + str(id)
-                    nums = int(nums) + 1
-                    row = self.cursor.execute("update fa_cms_tags set archives='{}',nums={} where id={};".format(archives, nums, type_id))
-                    self.con.commit()
-        else:
-            self.cursor.execute(
-                "insert into fa_cms_tags (`name`,archives,nums) value ('{}','{}',{});".format(block_type, id, 1))
-            self.con.commit()
+    def insert_mysql(self,kwargs_dict):
+        passed_archives = self.filder_archives(**kwargs_dict)
+        if not passed_archives:
+            self.insert_archives(**kwargs_dict)
+
+        id = self.id_archives(**kwargs_dict)
+        passed_addonnews = self.filder_addonnews(id)
+        if passed_addonnews:
+            return True
+        return self.insert_addonnews(id=id,**kwargs_dict)
+
+
 
 if __name__ == '__main__':
     # 以下是测试时使用,有必要的话重新编写测试

@@ -7,7 +7,7 @@
 
 from scrapy import signals
 from .models.filter_url import FilterUrl
-from scrapy.exceptions import IgnoreRequest,CloseSpider
+from scrapy.exceptions import IgnoreRequest,CloseSpider,DontCloseSpider
 
 from .spiders.info_spider import InfoSpider
 from .spiders.xfjy_spider import XfjySpider
@@ -20,6 +20,7 @@ class FilterRequestsMiddleware(object):
         # This method is used by Scrapy to create your spiders.
         s = cls()
         crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
+        crawler.signals.connect(s.spider_idle , signal=signals.spider_idle )
         return s
 
     def spider_opened(self, spider):
@@ -35,23 +36,30 @@ class FilterRequestsMiddleware(object):
         self.filter_url = FilterUrl(name)
 
     def process_request(self,request,spider):
-        if request.meta.get("forbid",None):
+        type = request.meta.get("type",None)
+        if type=="article":
             exist = self.filter_url.filter(request.url)
             if exist:
                 raise IgnoreRequest("ignore request: %s" % request.url)
             else:
                 return None
+        return None
 
+    def spider_idle(self,spider):
+        raise DontCloseSpider()
 
 class HomelandSpiderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
     # scrapy acts as if the spider middleware does not modify the
     # passed objects.
 
+    def __init__(self,stats):
+        self.stats = stats
+
     @classmethod
     def from_crawler(cls, crawler):
         # This method is used by Scrapy to create your spiders.
-        s = cls()
+        s = cls(crawler.stats)
         crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
         return s
 

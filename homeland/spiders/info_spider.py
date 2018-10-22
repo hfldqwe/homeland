@@ -88,18 +88,27 @@ class InfoSpider(scrapy.Spider):
         creat_time = int(time.mktime(time.strptime(creat_time,'%Y年%m月%d日 %H:%M')))
 
         # 文章内容
-        content = response.xpath("//div[@class='bulletin-content']").extract_first()
+        content = response.xpath("//div[@class='bulletin-content']")
+        if content:
+            img_links = content[0].xpath(".//@src").extract()
+            img = [response.urljoin(img_link) for img_link in img_links]
+            content = content.extract_first()
+            for img_link in img_links:
+                content = content.replace(img_link,response.urljoin(img_link))
+        else:
+            self.log("没有解析到文章内容，文章链接：%s" % response.url)
 
         # 附件
         attachments = response.xpath("//div[@class='att_content']//li")
         attachments = {i.xpath(".//text()").extract_first().strip() : i.xpath(".//span//a//@href").extract_first() for i in attachments[1:]}
         attachments = json.dumps(attachments,ensure_ascii=False)
 
-        item["position"] = block_type
+        item["block_type"] = block_type
         item["title"] = title
         item["attch_name_url"] = attachments
         item["author"] = author
         item["content"] = content
+        item["img"] = img
         item["detail_time"] = creat_time
         item["article_url"] = response.url
 

@@ -120,6 +120,7 @@ class XfjySpider(CrawlSpider):
         content = response.xpath("//div[@class='main_nei_you_baio_content']//td[@class='contentstyle44003']")
         if content:
             img_links = content[0].xpath(".//@src").extract()
+            img = [response.urljoin(img_link) for img_link in img_links]
             content = content.extract_first()
             for img_link in img_links:
                 content = content.replace(img_link,response.urljoin(img_link))
@@ -135,11 +136,12 @@ class XfjySpider(CrawlSpider):
             self.log("没有解析到文章详细时间，文章链接：%s" % response.url)
             detail_time = date
 
-        item["position"] = position
+        item["block_type"] = position
         item["title"] = title
         item["attch_name_url"] = attch_name_url
         item["author"] = author
         item["content"] = content
+        item["img"] = img
         item["detail_time"] = detail_time
         item["article_url"] = article_url
 

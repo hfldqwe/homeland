@@ -40,6 +40,7 @@ class HomelandItem(scrapy.Item):
     detail_time = scrapy.Field()    # 一个时间戳，如：1493395740
     article_url = scrapy.Field()    # 文章链接，如：http://xfjy.chd.edu.cn/info/1036/27354.htm\
     img = scrapy.Field() # 第一个图片地址
+    power = scrapy.Field() # 允许谁看,权限
 
 class OfficialItem(scrapy.Item):
     block_type = scrapy.Field(output_processor=Join())
@@ -49,6 +50,7 @@ class OfficialItem(scrapy.Item):
     detail_time = scrapy.Field(input_processor=MapCompose(str.strip,dispose_time) , output_processor=TakeFirst())
     article_url = scrapy.Field(output_processor=TakeFirst())
     img = scrapy.Field(input_processor=MapCompose(urljoin_img),output_processor=TakeFirst())
+    power = scrapy.Field(output_processor=TakeFirst())  # 允许谁看,权限
 
 
 

@@ -18,7 +18,7 @@ def mysql_conf(section):
 
 class YibanModel():
     def __init__(self):
-        host, port, username, password, db = mysql_conf("mysql_test")
+        host, port, username, password, db = mysql_conf("mysql_235")
         self.con = pymysql.connect(
             host = host,
             port = port,

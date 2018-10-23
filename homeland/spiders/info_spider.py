@@ -25,6 +25,12 @@ class InfoSpider(scrapy.Spider):
         self.username = username
         self.password = password
         self.source_type = source_type
+        if self.source_type == "info":
+            self.power = "all"
+        elif self.source_type == "info-teacher":
+            self.power = "teacher"
+        else:
+            self.power = "all"
 
         self.login_url = 'http://ids.chd.edu.cn/authserver/login?service=http%3A%2F%2Fportal.chd.edu.cn%2F'
         self.interval_time = time.time()
@@ -140,6 +146,7 @@ class InfoSpider(scrapy.Spider):
             item["img"] = ""
         item["detail_time"] = creat_time
         item["article_url"] = response.url
+        item["power"] = self.power
 
         yield item
 

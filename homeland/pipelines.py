@@ -46,6 +46,10 @@ class HomelandPipeline:
         else:
             style = 0
 
+        power = item.get("power", "all")
+        if not power:
+            power = "all"
+
         kwargs_dict = {
             # 额外的参数
             'article_url' : article_url,
@@ -69,7 +73,7 @@ class HomelandPipeline:
             'createtime' : int(time.time()),
             'publishtime' : item.get('detail_time'),
             'status' : 'normal',
-            'power' : 'all',  # 'all'.'student','teacher',
+            'power' : power,  # 'all'.'student','teacher',
 
             # addonnews表
             'content' : item.get("content"),

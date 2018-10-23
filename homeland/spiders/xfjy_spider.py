@@ -2,18 +2,24 @@
 # -*- coding: utf-8 -*-
 
 import scrapy
+from scrapy.http import Request
 import time
 import json
 import logging
 from scrapy.spiders import CrawlSpider,Rule
 from scrapy.linkextractors import LinkExtractor
 from ..items import HomelandItem
+from ..models.filter_url import FilterUrl
 import re
 
 class XfjySpider(CrawlSpider):
     name = "xfjy"
     allowed_demains = ["chd.edu.cn"]
     start_urls = ["http://xfjy.chd.edu.cn/"]
+
+    custom_settings = {
+        'DOWNLOAD_DELAY': 0,
+    }
 
     rules = (
         # 防止取到首页的另一个地址以及一些没用的地址
@@ -26,17 +32,36 @@ class XfjySpider(CrawlSpider):
         Rule(LinkExtractor(unique=True,allow=["http://xfjy.chd.edu.cn/wjhb.htm","http://xfjy.chd.edu.cn/cyxz.htm",
                                   "http://xfjy.chd.edu.cn/wjhb/tfxw.htm",],
                            deny=["xfjy.chd.edu.cn/.*?/\d{1,6}.htm", ]
-                           ),callback="parse_index"),
+                           ),
+             callback="parse_index"),
         # 取到新闻的地址
         Rule(LinkExtractor(unique=True,allow_domains="xfjy.chd.edu.cn",
                            deny=["xfjy.chd.edu.cn/.*?/\d{1,6}.htm",]
-                           ),callback="parse_index"),
+                           ),
+             callback="parse_index"),
     )
+
+    @classmethod
+    def from_crawler(cls, crawler, *args, **kwargs):
+        increment = crawler.settings.get("INCREMENT_CRAWL",False)
+        spider = super().from_crawler(crawler,increment=increment, *args, **kwargs)
+        return spider
+
+    def __init__(self,increment=False,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.repetition = []
+        self.filter = FilterUrl("xfjy_article_url")
+
+        self.increment = increment
 
     def parse_index(self, response):
         url = response.urljoin(response.url)
         if url != "http://xfjy.chd.edu.cn/":
-            yield scrapy.Request(url=url,callback=self.parse_item,dont_filter=True)
+            yield scrapy.Request(url=url,callback=self.parse_item,dont_filter=True,
+                                 meta={
+                                     "type":"start",
+                                     "start_url":response.url
+                                 })
 
     def parse_item(self, response):
         '''
@@ -50,6 +75,7 @@ class XfjySpider(CrawlSpider):
         position = response.xpath("string(//div[@class='weizhi']//td)").extract_first()
         position = "".join(position.split()).split(">>")
         position[0] = "先锋家园"
+        position = ",".join(position)
 
         # 解析出文章title，date，url，并且进行文章爬取
         tr_tags = response.xpath("//div[@class='main_nei_you_baio_content']//tr[@height='20']")
@@ -77,23 +103,38 @@ class XfjySpider(CrawlSpider):
                 self.log("没有解析到date，板块链接：%s" % response.url, level=logging.WARNING)
                 date = None
 
-            yield scrapy.Request(url, meta={"title": title, "date": date, "position": position,"forbid":True},
-                                 callback=self.parse_article)
+            if self.filter.filter(url):
+                self.repetition.append(url)
+            else:
+                yield scrapy.Request(url, meta={"title": title, "date": date, "position": position,"type":"article"},
+                                     callback=self.parse_article)
 
-        next_url = response.css(".Next::attr(href)").extract_first()
-        if next_url:
-            next_url = response.urljoin(next_url)
-            yield scrapy.Request(next_url,callback=self.parse_item,meta={"amount_item":amount_item})
+        # 如果有重复的就不再往下爬了
+        start_url = response.meta.get("start_url")
+        if self.repetition and self.increment:
+            ''' 如果存在重复的链接，那么不进行接下来的爬取，而是重复开始页面 '''
+            self.log("增量爬取")
+            yield Request(start_url,callback=self.parse_item,dont_filter=True,
+                          meta={
+                              "type":"start",
+                              "start_url":start_url,
+                          })
         else:
-            # 解析当前版块的文章条数
-            try:
-                amount = response.xpath(
-                    "//div[@class='main_nei_you_baio_content']//td[@id='fanye44007']//text()").extract_first()
-                amount = re.compile("共(.*?)条").findall(amount)[0]
-            except:
-                amount = 0
-            if int(amount_item) != int(amount):
-                self.log("爬取数量不对应，版块链接：{}，应爬：{} / 实爬：{}".format(response.url,amount,amount_item),level=logging.ERROR)
+            next_url = response.css(".Next::attr(href)").extract_first()
+            if next_url:
+                next_url = response.urljoin(next_url)
+                yield scrapy.Request(next_url,callback=self.parse_item,dont_filter=True,
+                                     meta={"amount_item":amount_item,"type":"start","start_url":start_url})
+            else:
+                # 解析当前版块的文章条数
+                try:
+                    amount = response.xpath(
+                        "//div[@class='main_nei_you_baio_content']//td[@id='fanye44007']//text()").extract_first()
+                    amount = re.compile("共(.*?)条").findall(amount)[0]
+                except:
+                    amount = 0
+                if int(amount_item) != int(amount):
+                    self.log("爬取数量不对应，版块链接：{}，应爬：{} / 实爬：{}".format(response.url,amount,amount_item),level=logging.ERROR)
 
 
     def parse_article(self, response):
@@ -141,7 +182,10 @@ class XfjySpider(CrawlSpider):
         item["attch_name_url"] = attch_name_url
         item["author"] = author
         item["content"] = content
-        item["img"] = img
+        if img:
+            item["img"] = img[0]
+        else:
+            item["img"] = ""
         item["detail_time"] = detail_time
         item["article_url"] = article_url
 
@@ -157,41 +201,8 @@ class XfjySpider(CrawlSpider):
         attachment = item["attch_name_url"]
         content = item["content"]
         '''
-
         yield item
 
-
-# 不知道为何在parser_item中进行调用，没有效果，直接写在里面就可以了，所以暂时不删除以下代码，希望找到bug后改回来
-    # def dispose(self,response,position):
-    #     '''
-    #     对板块的数据做进一步的处理,在parse_item中进行调用
-    #     '''
-    #     tr_tags = response.xpath("//div[@class='main_nei_you_baio_content']//tr[@height='20']")
-    #
-    #     for tr_tag in tr_tags:
-    #         # 提取文章的url,并且拼接为完整的链接
-    #         url = tr_tag.xpath(".//a//@href").extract_first()
-    #         if url:
-    #             url = response.urljoin(url)
-    #         else:
-    #             self.log("没有解析到文章url，板块链接：%s" % response.url, level=logging.ERROR)
-    #
-    #         # 将title提取出来并且进行解析
-    #         title = tr_tag.xpath(".//a//@title").extract_first()
-    #         if title:
-    #             title = "".join(title.split())
-    #         else:
-    #             self.log("没有解析到title，板块链接：%s" % response.url,level=logging.WARNING)
-    #
-    #         # 将date提取出来，并且进行解析成时间戳
-    #         date = tr_tag.xpath(".//span[@class='timestyle44007']//text()").extract_first()
-    #         if date:
-    #             date = int(time.mktime(time.strptime("".join(date.split()), "%Y年%m月%d日")))
-    #         else:
-    #             self.log("没有解析到date，板块链接：%s" % response.url, level=logging.WARNING)
-    #             date = None
-    #
-    #         yield scrapy.Request(url,meta={"title":title,"date":date,"position":position},callback=self.parse_article,dont_filter=True)
 
 
 

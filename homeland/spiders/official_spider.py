@@ -8,19 +8,24 @@ from scrapy.loader.processors import MapCompose
 from ..items import OfficialItem
 import time
 from ..models.filter_url import FilterUrl
-from twisted.internet import reactor,defer
-
-
 
 
 class OfficialSpider(scrapy.Spider):
     name = 'official'
     allowed_domains = ['news.chd.edu.cn']
 
-    def __init__(self,*args,**kwargs):
+    custom_settings = {
+        'DOWNLOAD_DELAY': 0.1,
+    }
+
+    @classmethod
+    def from_crawler(cls, crawler, *args, **kwargs):
+        increment = crawler.settings.get("INCREMENT_CRAWL",False)
+        return cls(increment=increment,*args,**kwargs)
+
+    def __init__(self,increment=False,*args,**kwargs):
         self.filter = FilterUrl(name="official_artical_url")
         self.repetition = []
-        self.d = defer.Deferred()
         self.start_urls = ['http://news.chd.edu.cn/300/list.htm',
                       'http://news.chd.edu.cn/301/list.htm',
                       'http://news.chd.edu.cn/xsxx1/list.htm',
@@ -28,13 +33,16 @@ class OfficialSpider(scrapy.Spider):
                       'http://news.chd.edu.cn/304/list.htm',
                       'http://news.chd.edu.cn/305/list.htm']
 
+        self.increment = increment
+
     def start_requests(self):
         for url in self.start_urls:
             yield Request(url=url,
                           callback=self.parse,
                           dont_filter=True,
                           meta={
-                              "type":"start"
+                              "type":"start",
+                              'start_url':url,
                           })
 
     def parse(self,response):
@@ -55,10 +63,11 @@ class OfficialSpider(scrapy.Spider):
                                   'type':'article',
                               })
 
-        if self.repetition:
+        if self.repetition and self.increment:
             ''' 如果存在重复的链接，那么不进行接下来的爬取，而是重复开始页面 '''
             self.log("增量爬取")
-            yield Request(url=response.url,
+            start_url = response.meta.get("start_url")
+            yield Request(url=start_url,
                           callback=self.parse,
                           dont_filter=True,
                           meta={

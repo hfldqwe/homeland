@@ -20,7 +20,6 @@ class FilterRequestsMiddleware(object):
         # This method is used by Scrapy to create your spiders.
         s = cls()
         crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
-        crawler.signals.connect(s.spider_idle , signal=signals.spider_idle )
         return s
 
     def spider_opened(self, spider):
@@ -29,7 +28,7 @@ class FilterRequestsMiddleware(object):
         elif isinstance(spider,XfjySpider):
             name = "xfjy_article_url"
         elif isinstance(spider,OfficialSpider):
-            name = "official_artical_url"
+            name = "official_article_url"
         else:
             spider.log("没有找到启动的爬虫,pipelines无法加载，%s" % spider.__class__)
             raise CloseSpider("没有找到启动的爬虫,pipelines无法加载，%s" % spider.__class__)
@@ -45,8 +44,6 @@ class FilterRequestsMiddleware(object):
                 return None
         return None
 
-    def spider_idle(self,spider):
-        raise DontCloseSpider()
 
 class HomelandSpiderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,

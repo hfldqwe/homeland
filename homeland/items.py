@@ -39,7 +39,7 @@ class HomelandItem(scrapy.Item):
     content = scrapy.Field()        # 内容
     detail_time = scrapy.Field()    # 一个时间戳，如：1493395740
     article_url = scrapy.Field()    # 文章链接，如：http://xfjy.chd.edu.cn/info/1036/27354.htm\
-    img = scrapy.Field(output_processor=TakeFirst()) # 第一个图片地址
+    img = scrapy.Field() # 第一个图片地址
 
 class OfficialItem(scrapy.Item):
     block_type = scrapy.Field(output_processor=Join())

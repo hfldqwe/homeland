@@ -83,6 +83,7 @@ class HomelandPipeline:
                 self.filter_url.add(article_url)
             else:
                 self.logger.error("url不在过滤池中，文章却保存到0了数据库")
-        except:
+        except BaseException as e:
+            self.logger.error(str(e))
             self.logger.error("数据库交互出现了错误")
 

@@ -52,6 +52,7 @@ class YibanModel():
             title = title[0:200]
         title = pymysql.escape_string(title)
         image = pymysql.escape_string(image)
+        attachfile = pymysql.escape_string(attachfile)
         sqlagr = '''INSERT INTO fa_cms_archives set `channel_id`="{}",`model_id`="{}",`title`="{}",`flag`="{}",`image`="{}",`attachfile`="{}",`keywords`="{}",`description`="{}",`tags`="{}",`weigh`="{}",`views`="{}",`comments`="{}",`likes`="{}",`dislikes`="{}",`diyname`="{}",`createtime`="{}",`publishtime`="{}",`status`="{}",`power`="{}";'''.format(
             channel_id, model_id, title, flag, image, attachfile, keywords, description, tags, weigh, views, comments, likes,dislikes, diyname, createtime, publishtime, status, power)
         rows = self.cursor.execute(sqlagr)

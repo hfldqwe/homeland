@@ -24,7 +24,7 @@ class OfficialSpider(scrapy.Spider):
         return cls(increment=increment,*args,**kwargs)
 
     def __init__(self,increment=False,*args,**kwargs):
-        self.filter = FilterUrl(name="official_artical_url")
+        self.filter = FilterUrl(name="official_article_url")
         self.repetition = []
         self.start_urls = ['http://news.chd.edu.cn/300/list.htm',
                       'http://news.chd.edu.cn/301/list.htm',

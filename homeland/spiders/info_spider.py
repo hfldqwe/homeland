@@ -84,6 +84,7 @@ class InfoSpider(scrapy.Spider):
 
             # 进行下一页的爬取，或者重复首页增量爬取
             if self.repetition and self.increment:
+                self.repetition = []  # 使repetition复原
                 self.log("增量爬取",level=logging.DEBUG)
                 interval_time = time.time() - self.interval_time
                 if interval_time >= 7200:
@@ -136,12 +137,13 @@ class InfoSpider(scrapy.Spider):
         attachments = json.dumps(attachments,ensure_ascii=False)
 
         item["block_type"] = block_type
+        item["tags_list"] = ["长大官网",block_type]
         item["title"] = title
         item["attch_name_url"] = attachments
         item["author"] = author
         item["content"] = content
         if img:
-            item["img"] = img[0]
+            item["img"] = img[0].replace("///","//")
         else:
             item["img"] = ""
         item["detail_time"] = creat_time

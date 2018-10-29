@@ -48,6 +48,8 @@ class OfficialSpider(scrapy.Spider):
     def parse(self,response):
         articles_url_title = response.xpath("//div[@id='wp_news_w9']//a")
         article_url_title = [( *(i.xpath(".//span//text()").extract()) , i.xpath(".//@href").extract_first()) for i in articles_url_title]
+        # 爬取tag
+        tags_list = response.xpath("//div[@class='list-head']//h2[@class='column-title']//text()").extract()
 
         # 爬取本页面上所有的文章标题，日期，并进行文章爬取
         for title,date,url in article_url_title:
@@ -61,10 +63,12 @@ class OfficialSpider(scrapy.Spider):
                               meta={
                                   'title':title,
                                   'type':'article',
+                                  'tags_list' : tags_list,
                               })
 
         if self.repetition and self.increment:
             ''' 如果存在重复的链接，那么不进行接下来的爬取，而是重复开始页面 '''
+            self.repetition = []    # 使repetition复原
             self.log("增量爬取")
             start_url = response.meta.get("start_url")
             yield Request(url=start_url,
@@ -74,7 +78,7 @@ class OfficialSpider(scrapy.Spider):
                               "type": "start"
                           })
         else:
-            # 当前页面的一些基本信息，页数，总页数，总文章数，下一页的链接
+            # 当前页面的一些基本信息，页数，总页数，总文章数，下一页的链接,tags_list
             info = response.xpath("//div[@id='wp_paging_w9']//ul")
             page = info.xpath(".//li[@class='pages_count']//em[@class='per_count']//text()").extract_first()
             amount = info.xpath(".//li[@class='pages_count']//em[@class='all_count']//text()").extract_first()
@@ -100,6 +104,8 @@ class OfficialSpider(scrapy.Spider):
         loader = ItemLoader(item=OfficialItem(),response=response)
 
         title = response.meta.get('title',None)
+        tags_list = response.meta.get('tags_list')
+        block_type = ",".join(tags_list)
 
         # 文章中需要提取的信息，标题，详细时间，内容，作者，来源
         article = response.xpath("//div[@class='article']")
@@ -114,13 +120,15 @@ class OfficialSpider(scrapy.Spider):
 
         loader.add_value("author",article_metas[1],re='作者：(.*)')
 
-        loader.add_value("block_type",article_metas[2],re='来源：(.*)')
+        loader.add_value("block_type",block_type)
 
-        loader.add_xpath("content","//div[@id='content']")
+        loader.add_value("content",response.xpath("//div[@id='content']"))
 
         loader.add_xpath("img","//div[@id='content']//@src")
 
         loader.add_value("article_url",response.url)
+
+        loader.add_value("tags_list",tags_list)
 
         yield loader.load_item()
 

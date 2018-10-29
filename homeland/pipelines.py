@@ -28,7 +28,7 @@ class HomelandPipeline:
             self.source_type = "xfjy"
             self.channel_id = 5
         elif isinstance(spider,OfficialSpider):
-            name = "official_artical_url"
+            name = "official_article_url"
             self.source_type = "official"
             self.channel_id = 4
         else:
@@ -70,8 +70,8 @@ class HomelandPipeline:
             'likes' : 0,
             'dislikes' : 0,
             'diyname' : '',
-            'createtime' : int(time.time()),
-            'publishtime' : item.get('detail_time'),
+            'createtime' : item.get('detail_time'),
+            'publishtime' : int(time.time()),
             'status' : 'normal',
             'power' : power,  # 'all'.'student','teacher',
 
@@ -79,6 +79,9 @@ class HomelandPipeline:
             'content' : item.get("content"),
             'author' : item.get("author",""),
             'style' : style,
+
+            # tags表
+            'tags_list' : item.get('tags_list'),
         }
 
         try:
@@ -86,8 +89,7 @@ class HomelandPipeline:
             if passed:
                 self.filter_url.add(article_url)
             else:
-                self.logger.error("url不在过滤池中，文章却保存到0了数据库")
+                self.logger.error("url不在过滤池中，文章却保存到了数据库")
         except BaseException as e:
             self.logger.error(str(e))
             self.logger.error("数据库交互出现了错误")
-

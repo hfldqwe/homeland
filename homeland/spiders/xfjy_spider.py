@@ -71,11 +71,10 @@ class XfjySpider(CrawlSpider):
         '''
         amount_item = response.meta.get("amount_item",0)
 
-        # 将位置（板块名称）进行解析组合成为我们需要的名称
-        position = response.xpath("string(//div[@class='weizhi']//td)").extract_first()
-        position = "".join(position.split()).split(">>")
-        position[0] = "先锋家园"
-        position = ",".join(position)
+        # 将位置（标签）进行解析组合成为我们需要的名称
+        tags_list = response.xpath("string(//div[@class='weizhi']//td)").extract_first()
+        tags_list = "".join(tags_list.split()).split(">>")
+        tags_list[0] = "先锋家园"
 
         # 解析出文章title，date，url，并且进行文章爬取
         tr_tags = response.xpath("//div[@class='main_nei_you_baio_content']//tr[@height='20']")
@@ -106,13 +105,14 @@ class XfjySpider(CrawlSpider):
             if self.filter.filter(url):
                 self.repetition.append(url)
             else:
-                yield scrapy.Request(url, meta={"title": title, "date": date, "position": position,"type":"article"},
+                yield scrapy.Request(url, meta={"title": title, "date": date, "tags_list": tags_list,"type":"article"},
                                      callback=self.parse_article)
 
         # 如果有重复的就不再往下爬了
         start_url = response.meta.get("start_url")
         if self.repetition and self.increment:
             ''' 如果存在重复的链接，那么不进行接下来的爬取，而是重复开始页面 '''
+            self.repetition = []  # 使repetition复原
             self.log("增量爬取")
             yield Request(start_url,callback=self.parse_item,dont_filter=True,
                           meta={
@@ -142,7 +142,8 @@ class XfjySpider(CrawlSpider):
 
         title = response.meta["title"]
         date = response.meta["date"]
-        position = response.meta["position"]
+        tags_list = response.meta["tags_list"]
+        block_type = ",".join(tags_list)
 
         article_url = response.url
 
@@ -177,7 +178,8 @@ class XfjySpider(CrawlSpider):
             self.log("没有解析到文章详细时间，文章链接：%s" % response.url)
             detail_time = date
 
-        item["block_type"] = position
+        item["block_type"] = block_type
+        item["tags_list"] = tags_list
         item["title"] = title
         item["attch_name_url"] = attch_name_url
         item["author"] = author

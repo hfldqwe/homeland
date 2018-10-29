@@ -93,6 +93,44 @@ class YibanModel():
         id = self.cursor.fetchone()[0]
         return id
 
+    def _tag_is_exist(self,tag,*args,**kwargs):
+        ''' 判断tags是否存在，存在就返回 1，不存在就返回 0 '''
+        sqlagr = "select id,archives,nums from fa_cms_tags where `name`='{}';".format(tag)
+        row = self.cursor.execute(sqlagr)
+        if row >=1:
+            return self.cursor.fetchone()
+        else:
+            return 0
+
+    def insert_tag(self,archives_id,tag,*args,**kwargs):
+        ''' 插入或者更新tags表中archives字段 '''
+        data = self._tag_is_exist(tag=tag)
+        if data:
+            id, archives, nums = data
+            archives = archives + str(archives_id)
+            nums = int(nums) + 1
+            sqlagr = "update fa_cms_tags set archives='{}',nums={} where id={};".format(archives,nums,id)
+            row = self.cursor.execute(sqlagr)
+            self.con.commit()
+            if row == 0:
+                self.logger.error("更新数据表tags失败，archives_id：{}".format(archives_id))
+                return False
+            return True
+        else:
+            sqlagr = "insert into fa_cms_tags set `name`='{}',archives='{}';".format(tag,"1")
+            row = self.cursor.execute(sqlagr)
+            self.con.commit()
+            if row == 0:
+                self.logger.error("插入数据表tags失败，archives_id：{}".format(archives_id))
+                return False
+            return True
+
+    def insert_tags(self,archives_id,tags_list,*args,**kwargs):
+        ''' 做一层封装，插入tags '''
+        for tag in tags_list:
+            self.insert_tag(archives_id,tag)
+
+
     def insert_mysql(self,kwargs_dict):
         passed_archives = self.filder_archives(**kwargs_dict)
         if not passed_archives:
@@ -102,7 +140,11 @@ class YibanModel():
         passed_addonnews = self.filder_addonnews(id)
         if passed_addonnews:
             return True
+
+        self.insert_tags(archives_id=id,**kwargs_dict)
         return self.insert_addonnews(id=id,**kwargs_dict)
+
+
 
 
 

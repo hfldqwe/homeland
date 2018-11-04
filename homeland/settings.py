@@ -99,13 +99,13 @@ ITEM_PIPELINES = {
 REACTOR_THREADPOOL_MAXSIZE = 50
 
 # config log file
-today = datetime.datetime.now()
-log_file_path = "/home/py/project/homeland/log/scrapy-{}-{}-{}-{}-{}.log".format(today.year,today.month,today.day,today.hour,today.minute)
-LOG_ENABLED=True
-LOG_ENCODING='utf-8'
-LOG_FILE = log_file_path
-LOG_LEVEL = "WARNING"
-LOG_STDOUT = True
+# today = datetime.datetime.now()
+# log_file_path = "/home/py/project/homeland/log/scrapy-{}-{}-{}-{}-{}.log".format(today.year,today.month,today.day,today.hour,today.minute)
+# LOG_ENABLED=True
+# LOG_ENCODING='utf-8'
+# LOG_FILE = log_file_path
+# LOG_LEVEL = "WARNING"
+# LOG_STDOUT = True
 
 # 配置 是否启动增量爬取,默认为False
 INCREMENT_CRAWL = False

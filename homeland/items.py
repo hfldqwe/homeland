@@ -9,15 +9,16 @@ import scrapy
 from scrapy.loader import ItemLoader
 from scrapy.loader.processors import TakeFirst,MapCompose,Join
 import time
+import json
 
 
 def dispose_time(time_str):
     tupletime = time.strptime(time_str,'发布时间：%Y-%M-%d')
     return int(time.mktime(tupletime))
 
-def urljoin_img(img,loader_context):
-    ''' 用来补全context链接的 '''
-    return loader_context['response'].urljoin(img)
+def urljoin_url(url,loader_context):
+    ''' 用来补全链接 '''
+    return loader_context['response'].urljoin(url)
 
 def urljoin_content(content,loader_context):
     ''' 将文章中的链接补全 '''
@@ -50,9 +51,116 @@ class OfficialItem(scrapy.Item):
     content = scrapy.Field(input_processor=MapCompose(urljoin_content), output_processor=TakeFirst())
     detail_time = scrapy.Field(input_processor=MapCompose(str.strip,dispose_time) , output_processor=TakeFirst())
     article_url = scrapy.Field(output_processor=TakeFirst())
-    img = scrapy.Field(input_processor=MapCompose(urljoin_img),output_processor=TakeFirst())
+    img = scrapy.Field(input_processor=MapCompose(urljoin_url),output_processor=TakeFirst())
     power = scrapy.Field(output_processor=TakeFirst())  # 允许谁看,权限
     tags_list = scrapy.Field()  # 这个专门用于tags表的标签
+
+
+def dispose_tags_list(tags_list):
+    ''' 用来处理tags_list字段 '''
+    tags_list = "".join(tags_list.split()).split(">>")
+    tags_list[0] = "先锋家园"
+    return tags_list
+
+def dispose_title(title):
+    title = "".join(title.split())
+    return title
+
+def date(date):
+    ''' 用来处理时间，如：2018年8月8日 '''
+    date = int(time.mktime(time.strptime("".join(date.split()), "%Y年%m月%d日")))
+    return date
+
+def xfjy_attachments_out(attchments,context):
+    response = context.get("response")
+    names_urls = [(attchment.xpath(".//span//text()").extract_first(), attchment.xpath(".//@href").extract_first()) for
+                  attchment in attchments]
+    name_url = {name: response.urljoin(url) for name, url in names_urls}
+    return json.dumps(name_url, ensure_ascii=False)
+
+def xfjy_detail_time_in(detail_time):
+    detail_time = "".join(detail_time.split())
+    detail_time = int(time.mktime(time.strptime(detail_time, "%Y-%m-%d%H:%M")))
+    return detail_time
+
+class XfjyItemItem(scrapy.Item):
+    tags_list = scrapy.Field(input_processor=MapCompose(dispose_tags_list))
+    articel_url = scrapy.Field(input_processor=MapCompose(urljoin_url) , output_processor=TakeFirst())
+    title = scrapy.Field(input_processor=MapCompose(dispose_title), output_processor=TakeFirst())
+    date = scrapy.Field(input_processor=MapCompose(date), output_processor=TakeFirst())
+    next_url = scrapy.Field(input_processor=MapCompose(urljoin_url), output_processor=TakeFirst())
+    amount = scrapy.Field()
+
+class XfjyArticleItem(scrapy.Item):
+    block_type = scrapy.Field(output_processor=Join())
+    title = scrapy.Field(output_processor=TakeFirst())
+    author = scrapy.Field(input_processor=MapCompose(lambda author:"".join(author.split())),output_processor=TakeFirst())
+    content = scrapy.Field(input_processor=MapCompose(urljoin_content), output_processor=TakeFirst())
+    detail_time = scrapy.Field(input_processor=MapCompose(str.strip,xfjy_detail_time_in) , output_processor=TakeFirst())
+    article_url = scrapy.Field(output_processor=TakeFirst())
+    img = scrapy.Field(input_processor=MapCompose(urljoin_url),output_processor=TakeFirst())
+    tags_list = scrapy.Field()  # 这个专门用于tags表的标签
+    attch_name_url = scrapy.Field(output_processor=xfjy_attachments_out)
+    power = scrapy.Field(output_processor=TakeFirst())  # 允许谁看,权限
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

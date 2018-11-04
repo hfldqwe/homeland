@@ -24,16 +24,16 @@ class OfficialSpider(scrapy.Spider):
         return cls(increment=increment,*args,**kwargs)
 
     def __init__(self,increment=False,*args,**kwargs):
+        self.increment = increment
         self.filter = FilterUrl(name="official_article_url")
         self.repetition = []
+
         self.start_urls = ['http://news.chd.edu.cn/300/list.htm',
                       'http://news.chd.edu.cn/301/list.htm',
                       'http://news.chd.edu.cn/xsxx1/list.htm',
                       'http://news.chd.edu.cn/303/list.htm',
                       'http://news.chd.edu.cn/304/list.htm',
                       'http://news.chd.edu.cn/305/list.htm']
-
-        self.increment = increment
 
     def start_requests(self):
         for url in self.start_urls:
@@ -46,59 +46,23 @@ class OfficialSpider(scrapy.Spider):
                           })
 
     def parse(self,response):
-        articles_url_title = response.xpath("//div[@id='wp_news_w9']//a")
-        article_url_title = [( *(i.xpath(".//span//text()").extract()) , i.xpath(".//@href").extract_first()) for i in articles_url_title]
-        # 爬取tag
-        tags_list = response.xpath("//div[@class='list-head']//h2[@class='column-title']//text()").extract()
+        start_url = response.meta.get("start_url")
 
-        # 爬取本页面上所有的文章标题，日期，并进行文章爬取
-        for title,date,url in article_url_title:
-            article_url = response.urljoin(url)
-
-            exist = self.filter.filter(article_url)
-            if exist:
-                self.repetition.append(article_url)
-            else:
-                yield Request(url=article_url,callback=self.parse_article,
-                              meta={
-                                  'title':title,
-                                  'type':'article',
-                                  'tags_list' : tags_list,
-                              })
-
-        if self.repetition and self.increment:
-            ''' 如果存在重复的链接，那么不进行接下来的爬取，而是重复开始页面 '''
-            self.repetition = []    # 使repetition复原
+        # 如果request_list不为空，那么将进行request_list中的request放入队列进行爬取
+        # 否则重复开始页面爬取，直到有新的文章。
+        request_list = self._article_requests(response)
+        if not request_list and self.increment:
             self.log("增量爬取")
-            start_url = response.meta.get("start_url")
-            yield Request(url=start_url,
-                          callback=self.parse,
-                          dont_filter=True,
+            yield Request(url=start_url,callback=self.parse,dont_filter=True,
                           meta={
-                              "type": "start"
+                              "type": "start",
+                              "start_url":start_url,
                           })
         else:
-            # 当前页面的一些基本信息，页数，总页数，总文章数，下一页的链接,tags_list
-            info = response.xpath("//div[@id='wp_paging_w9']//ul")
-            page = info.xpath(".//li[@class='pages_count']//em[@class='per_count']//text()").extract_first()
-            amount = info.xpath(".//li[@class='pages_count']//em[@class='all_count']//text()").extract_first()
+            for request in request_list:
+                yield request
 
-            next_url = info.xpath(".//li[@class='page_nav']//a[@class='next']//@href").extract_first()
-
-            current = info.xpath(".//li[@class='page_jump']//em[@class='curr_page']//text()").extract_first()
-            end = info.xpath(".//li[@class='page_jump']//em[@class='all_pages']//text()").extract_first()
-
-            # 进行下一页爬取或者结束
-            if 'javascript' in next_url and int(current) == int(end):
-                self.log("本页爬取正常结束,链接：{}".format(response.url),level=logging.DEBUG)
-            elif 'javascript' in next_url or int(current) == int(end):
-                self.log("本页爬取异常结束,链接：{}".format(response.url),level=logging.ERROR)
-            else:
-                next_url = response.urljoin(next_url)
-                yield Request(next_url,callback=self.parse,
-                              meta={
-                                  "type":"item",
-                              })
+            yield self._next_request(response,start_url)
 
     def parse_article(self,response):
         loader = ItemLoader(item=OfficialItem(),response=response)
@@ -113,22 +77,60 @@ class OfficialSpider(scrapy.Spider):
             loader.add_xpath("title",".//h1[@class='arti-title']//text()")
         else:
             loader.add_value("title",title)
-
         article_metas = article.xpath(".//p[@class='arti-metas']//span//text()").extract()
-
         loader.add_value("detail_time",article_metas[0])
-
         loader.add_value("author",article_metas[1],re='作者：(.*)')
-
         loader.add_value("block_type",block_type)
-
         loader.add_value("content",response.xpath("//div[@id='content']"))
-
         loader.add_xpath("img","//div[@id='content']//@src")
-
         loader.add_value("article_url",response.url)
-
         loader.add_value("tags_list",tags_list)
 
         yield loader.load_item()
 
+    def _article_requests(self,response):
+        request_list = []   # 用来存放返回的request对象
+
+        # 提取出标题，日期和url
+        title_date_url = response.xpath("//div[@id='wp_news_w9']//a")
+        title_date_url = [(*(i.xpath(".//span//text()").extract()), i.xpath(".//@href").extract_first()) for i in
+                          title_date_url]
+        # 爬取tag
+        tags_list = response.xpath("//div[@class='list-head']//h2[@class='column-title']//text()").extract()
+
+        # 爬取本页面上所有的文章标题，日期，并进行文章爬取
+        for title,date,url in title_date_url:
+            article_url = response.urljoin(url)
+            exist = self.filter.filter(article_url)
+            if not exist:
+                request = Request(url=article_url, callback=self.parse_article,
+                              meta={
+                                  'title': title,
+                                  'type': 'article',
+                                  'tags_list': tags_list,
+                              })
+                request_list.append(request)
+
+        return request_list
+
+    def _next_request(self,response,start_url):
+        # 当前页面的一些基本信息，页数，总页数，总文章数，下一页的链接,tags_list
+        info = response.xpath("//div[@id='wp_paging_w9']//ul")
+
+        next_url = info.xpath(".//li[@class='page_nav']//a[@class='next']//@href").extract_first()
+        current = info.xpath(".//li[@class='page_jump']//em[@class='curr_page']//text()").extract_first()
+        end = info.xpath(".//li[@class='page_jump']//em[@class='all_pages']//text()").extract_first()
+
+        # 进行下一页的爬取，或者结束爬取
+        if 'javascript' in next_url:
+            if int(current) == int(end):
+                self.log("本页爬取正常结束,链接：{}".format(response.url), level=logging.DEBUG)
+            else:
+                self.log("本页爬取异常结束,链接：{}".format(response.url), level=logging.ERROR)
+        else:
+            next_url = response.urljoin(next_url)
+            return Request(next_url, callback=self.parse,
+                          meta={
+                              "type": "item",
+                              "start_url" : start_url,
+                          })

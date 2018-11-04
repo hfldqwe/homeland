@@ -18,7 +18,7 @@ def mysql_conf(section):
 
 class YibanModel():
     def __init__(self):
-        host, port, username, password, db = mysql_conf("mysql_235")
+        host, port, username, password, db = mysql_conf("mysql_test")
         self.con = pymysql.connect(
             host = host,
             port = port,
@@ -29,7 +29,7 @@ class YibanModel():
         self.cursor = self.con.cursor()
         self.logger = logging.getLogger()
 
-    def filder_archives(self,article_url,title,publishtime,tags,*args,**kwargs):
+    def filder_archives(self,article_url,channel_id,title,tags,power,*args,**kwargs):
         '''
         用来过滤掉重复的参数，判断依据是：title，publish_time，tags
         :param title: 标题
@@ -38,13 +38,33 @@ class YibanModel():
         :return: 已经存在就返回1（True）
         '''
         title = pymysql.escape_string(title)
-        sqlagr = "select id from fa_cms_archives where title='{}' and publishtime='{}' and tags='{}';".format(
-            title, publishtime, tags)
+        sqlagr = "select id,power from fa_cms_archives where channel_id='{}' and title='{}' and tags='{}';".format(
+            channel_id, title, tags)
         rows = self.cursor.execute(sqlagr)
         if rows >= 1:
             self.logger.error("archives表中数据已存在，文章链接：{}".format(article_url))
+            id, old_power = self.cursor.fetchone()
+            self._update_power(id,old_power,power)
             return 1
         return 0
+
+    def _update_power(self,id,old_power,power):
+        if old_power == "all":
+            return
+        elif old_power == power:
+            return
+        else:
+            sqlagr = "update fa_cms_archives set power='all' where id={};".format(id)
+            self.cursor.execute(sqlagr)
+            self.con.commit()
+
+    def id_archives(self,channel_id,title, tags,*args,**kwargs):
+        ''' 查询这条数据的id '''
+        title = pymysql.escape_string(title)
+        self.cursor.execute(
+            "select id from fa_cms_archives where channel_id={} and title='{}' and tags='{}';".format(channel_id,title, tags))
+        id = self.cursor.fetchone()[0]
+        return id
 
     def insert_archives(self,article_url,channel_id,model_id,title,flag,image,attachfile,keywords,description,tags,weigh,views,comments,likes,dislikes,diyname,createtime,publishtime,status,power,*args,**kwargs):
         ''' 插入数据库 '''
@@ -84,14 +104,6 @@ class YibanModel():
             self.logger.error("插入addonnews表失败，文章id={}".format(id))
             return False
         return True
-
-    def id_archives(self,title, publishtime, tags,*args,**kwargs):
-        ''' 查询这条数据的id '''
-        title = pymysql.escape_string(title)
-        self.cursor.execute(
-            "select id from fa_cms_archives where title='{}' and publishtime='{}' and tags='{}';".format(title, publishtime, tags))
-        id = self.cursor.fetchone()[0]
-        return id
 
     def _tag_is_exist(self,tag,*args,**kwargs):
         ''' 判断tags是否存在，存在就返回 1，不存在就返回 0 '''

@@ -5,7 +5,7 @@ import logging
 from scrapy.http import Request
 from scrapy.loader import ItemLoader
 from scrapy.loader.processors import MapCompose
-from ..items import OfficialItem
+from ..items import OfficialItem,ImageItem
 import time
 from ..models.filter_url import FilterUrl
 
@@ -34,6 +34,8 @@ class OfficialSpider(scrapy.Spider):
                       'http://news.chd.edu.cn/303/list.htm',
                       'http://news.chd.edu.cn/304/list.htm',
                       'http://news.chd.edu.cn/305/list.htm']
+
+        self.order = 1
 
     def start_requests(self):
         for url in self.start_urls:
@@ -67,6 +69,7 @@ class OfficialSpider(scrapy.Spider):
     def parse_article(self,response):
         loader = ItemLoader(item=OfficialItem(),response=response)
 
+        index = response.meta.get("index")
         title = response.meta.get('title',None)
         tags_list = response.meta.get('tags_list')
         block_type = ",".join(tags_list)
@@ -85,14 +88,45 @@ class OfficialSpider(scrapy.Spider):
         loader.add_xpath("img","//div[@id='content']//@src")
         loader.add_value("article_url",response.url)
         loader.add_value("tags_list",tags_list)
+        loader.add_value("index",index)
+
+        imgs = loader.get_collected_values("img")
+        if imgs:
+            for img in imgs:
+                if "http" in img:
+                    yield Request(img, callback=self.parse_img, dont_filter=True,
+                                  meta={"type": "image", "article_url": response.url})
 
         yield loader.load_item()
 
+    def parse_img(self, response):
+        image_item = ImageItem()
+        name = self.dispose_url(response.url)
+
+        image_item["img"] = response.body
+        image_item["name"] = name
+        image_item["article_url"] = response.meta.get("article_url")
+        image_item["image_url"] = response.url
+
+        if not response.body:
+            self.logger.error("尝试重新爬取图片地址")
+            yield Request(response.url, callback=self.parse_img, dont_filter=True,
+                          meta={"type": "image", "article_url": image_item["article_url"]})
+
+        yield image_item
+
+    def dispose_url(self,url):
+        name = url.split("/")[-1]
+        name = name.split("=")[-1]
+        return name
+
     def _article_requests(self,response):
+        index = self.order
         request_list = []   # 用来存放返回的request对象
 
         # 提取出标题，日期和url
         title_date_url = response.xpath("//div[@id='wp_news_w9']//a")
+        self.order += self.order + len(title_date_url)
         title_date_url = [(*(i.xpath(".//span//text()").extract()), i.xpath(".//@href").extract_first()) for i in
                           title_date_url]
         # 爬取tag
@@ -108,8 +142,10 @@ class OfficialSpider(scrapy.Spider):
                                   'title': title,
                                   'type': 'article',
                                   'tags_list': tags_list,
+                                  'index':index
                               })
                 request_list.append(request)
+                index += 1
 
         return request_list
 

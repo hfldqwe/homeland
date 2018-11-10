@@ -5,6 +5,7 @@
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: https://doc.scrapy.org/en/latest/topics/item-pipeline.html
 import time
+import os.path
 from .models.news_model import YibanModel
 from .models.filter_url import FilterUrl
 import logging
@@ -13,8 +14,101 @@ from .spiders.info_spider import InfoSpider
 from .spiders.xfjy_spider import XfjySpider
 from .spiders.official_spider import OfficialSpider
 
+from .utils.img_qiniu import UploadImage
+
 from scrapy.exceptions import CloseSpider
 
+from .items import ImageItem
+
+from scrapy import signals
+
+
+logger = logging.getLogger()
+
+class OrderPipeline:
+    def __init__(self,*args,**kwargs):
+        '''
+        self.item_shelter = {<type1>:
+                                    {
+                                    1:item1,
+                                    2:item2,
+                                    ...
+                                    },
+                                ...
+                                }
+        self.item_scheduler = {<type1>:<order>,...}
+        '''
+        self.item_scheduler = {}    # 用于维护顺序
+        self.item_shelter = {}      # 用于临时存储shelter
+
+    def _add_shelter(self,item,type,index):
+        ''' 增加item '''
+        if type in self.item_shelter:
+            self.item_shelter[type][index] = item
+        else:
+            self.item_shelter[type] = {"1":item}
+
+    def _index_items(self,index,type,item,*args,**kwargs):
+        if index == "0":
+            index_items = self.item_shelter.pop(type)
+            index_items = sorted(index_items.items(),reverse=True)
+            return index_items
+        else:
+            return None
+
+    def process_item(self, item, spider):
+        index = item.get("index",1)
+        type = item.get("type",None)
+        if not type:
+            logger.error("没有type，item：{}".format(item))
+            return None
+
+        index_items = self._index_items(index=index,type=type,item=item)
+        if index_items:
+            return index_items
+        else:
+            self._add_shelter(item=item,type=type,index=index)
+        return
+
+class ImagePipeline:
+    def open_spider(self, spider):
+        self.url = 'http://yibancdn.ohao.ren/'
+        self.upload = UploadImage()
+
+    def process_item(self, item, spider):
+        if isinstance(item, ImageItem):
+            name = item.get("name")
+            image = item.get("img")
+            article_url = item.get("article_url")
+            image_url = item.get("image_url")
+            if image:
+                self.upload_image(img=image,name=name)
+            else:
+                logger.error("没有解析到图片,文章地址：{}，图片地址：{}".format(article_url,image_url))
+            return None
+        else:
+            imgs = item.get("img")
+            content = item.get("content")
+
+            if imgs:
+                imgs_new = [os.path.join(self.url,self.dispose_url(img_url)) for img_url in imgs]
+                img = imgs_new[0]
+                for i in range(len(imgs)):
+                    content = content.replace(imgs[i],imgs_new[i])
+            else:
+                img = ""
+
+            item["img"] = img
+            item["content"] = content
+            return item
+
+    def dispose_url(self,url):
+        name = url.split("/")[-1]
+        name = name.split("=")[-1]
+        return name
+
+    def upload_image(self,img,name):
+        return self.upload.uplode(image_content=img,name=name)
 
 class HomelandPipeline:
     def open_spider(self,spider):
@@ -37,8 +131,20 @@ class HomelandPipeline:
 
         self.yiban = YibanModel()
         self.filter_url = FilterUrl(name)
+        self.data = list()
+
+    # def process_item(self, item, spider):
+    #     index_items = item
+    #     if not index_items:
+    #         return
+    #     else:
+    #         for index,item in index_items:
+    #             self.process_item(item=item,spider=spider)
 
     def process_item(self, item, spider):
+        if not item:
+            return None
+
         article_url = item.get("article_url")
         img = item.get('img', '')
         if img:
@@ -82,14 +188,27 @@ class HomelandPipeline:
 
             # tags表
             'tags_list' : item.get('tags_list'),
+
+            "index":item.get("index")
         }
 
-        try:
-            passed = self.yiban.insert_mysql(kwargs_dict=kwargs_dict)
-            if passed:
-                self.filter_url.add(article_url)
-            else:
-                self.logger.error("url不在过滤池中，文章却保存到了数据库")
-        except BaseException as e:
-            self.logger.error(str(e))
-            self.logger.error("数据库交互出现了错误")
+        self.filter_url.add(article_url)
+        self.data.append(kwargs_dict)
+
+    def close_spider(self,spider):
+        # import time
+        data = sorted(self.data,key=lambda x:x["index"],reverse=True)
+        # print(len(data))
+        for kwargs_dict in data:
+            try:
+                kwargs_dict.pop("index")
+                passed = self.yiban.insert_mysql(kwargs_dict=kwargs_dict)
+                if passed:
+                    self.logger.debug("插入数据库成功")
+                    pass#self.filter_url.add(article_url)
+                else:
+                    self.logger.error("url不在过滤池中，文章却保存到了数据库")
+            except BaseException as e:
+                self.logger.error(str(e))
+                self.logger.error("数据库交互出现了错误")
+

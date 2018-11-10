@@ -17,8 +17,8 @@ def mysql_conf(section):
         raise Exception("读取mysql配置出现错误")
 
 class YibanModel():
-    def __init__(self):
-        host, port, username, password, db = mysql_conf("mysql_test")
+    def __init__(self,*args,**kwargs):
+        host, port, username, password, db = mysql_conf("mysql_235")
         self.con = pymysql.connect(
             host = host,
             port = port,
@@ -119,7 +119,7 @@ class YibanModel():
         data = self._tag_is_exist(tag=tag)
         if data:
             id, archives, nums = data
-            archives = archives + str(archives_id)
+            archives = pymysql.escape_string(archives + ","+str(archives_id))
             nums = int(nums) + 1
             sqlagr = "update fa_cms_tags set archives='{}',nums={} where id={};".format(archives,nums,id)
             row = self.cursor.execute(sqlagr)
@@ -142,7 +142,6 @@ class YibanModel():
         for tag in tags_list:
             self.insert_tag(archives_id,tag)
 
-
     def insert_mysql(self,kwargs_dict):
         passed_archives = self.filder_archives(**kwargs_dict)
         if not passed_archives:
@@ -155,6 +154,89 @@ class YibanModel():
 
         self.insert_tags(archives_id=id,**kwargs_dict)
         return self.insert_addonnews(id=id,**kwargs_dict)
+
+# class MoveModel(YibanModel):
+#     def __init__(self,*args,**kwargs):
+#         host, port, username, password, db = mysql_conf("mysql_235")
+#         self.con = pymysql.connect(
+#             host=host,
+#             port=port,
+#             user=username,
+#             password=password,
+#             db=db,
+#         )
+#         self.cursor = self.con.cursor()
+#         self.logger = logging.getLogger()
+#
+#         host, port, username, password, db = mysql_conf("mysql_test")
+#         self.con_test = pymysql.connect(
+#             host=host,
+#             port=port,
+#             user=username,
+#             password=password,
+#             db=db,
+#         )
+#         self.cursor_test = self.con.cursor()
+#
+#     def insert_archives(self,article_url,channel_id,model_id,title,flag,image,attachfile,keywords,description,tags,weigh,views,comments,likes,dislikes,diyname,createtime,publishtime,status,power,*args,**kwargs):
+#         ''' 插入数据库 '''
+#         if len(title)>=200:
+#             title = title[0:200]
+#         title = pymysql.escape_string(title)
+#         image = pymysql.escape_string(image)
+#         attachfile = pymysql.escape_string(attachfile)
+#         sqlagr = '''INSERT INTO fa_cms_archives set `channel_id`="{}",`model_id`="{}",`title`="{}",`flag`="{}",`image`="{}",`attachfile`="{}",`keywords`="{}",`description`="{}",`tags`="{}",`weigh`="{}",`views`="{}",`comments`="{}",`likes`="{}",`dislikes`="{}",`diyname`="{}",`createtime`="{}",`publishtime`="{}",`status`="{}",`power`="{}";'''.format(
+#             channel_id, model_id, title, flag, image, attachfile, keywords, description, tags, weigh, views, comments, likes,dislikes, diyname, createtime, publishtime, status, power)
+#         rows = self.cursor.execute(sqlagr)
+#         self.con.commit()
+#         if rows<1:
+#             self.logger.error("插入archives表错误：插入失败，文章链接：{}".format(article_url))
+#             return False
+#         return True
+#
+#     def fetch(self):
+#         sqlarg = "select id,channel_id,article_url,channel_id,model_id,title,flag,image,attachfile,keywords,description,tags,weigh,views,comments,likes,dislikes,diyname,createtime,publishtime,status,power from fa_cms_archives order by index DESC;"
+#         rows = self.cursor.execute(sqlarg)
+#         data = self.cursor.fetchall()
+#         for archives in data:
+#             id, channel_id, article_url, channel_id, model_id, title, flag, image, attachfile, keywords, description, tags, weigh, views, comments, likes, dislikes, diyname, createtime, publishtime, status, power = archives
+#             kwargs_dict = {
+#                 # 额外的参数
+#                 'article_url': article_url,
+#
+#                 # archives表
+#                 'channel_id': self.channel_id,
+#                 'model_id': 1,
+#                 'title': item["title"],
+#                 'flag': '',
+#                 'image': img,
+#                 'attachfile': item.get("attch_name_url", ''),
+#                 'keywords': '',
+#                 'description': '',
+#                 'tags': item.get('block_type'),
+#                 'weigh': 0,
+#                 'views': 0,
+#                 'comments': 0,
+#                 'likes': 0,
+#                 'dislikes': 0,
+#                 'diyname': '',
+#                 'createtime': item.get('detail_time'),
+#                 'publishtime': int(time.time()),
+#                 'status': 'normal',
+#                 'power': power,  # 'all'.'student','teacher',
+#
+#                 # addonnews表
+#                 'content': item.get("content"),
+#                 'author': item.get("author", ""),
+#                 'style': style,
+#
+#                 # tags表
+#                 'tags_list': item.get('tags_list'),
+#
+#                 "index": item.get("index")
+#             }
+
+
 
 
 

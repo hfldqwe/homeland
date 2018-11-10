@@ -1,17 +1,16 @@
 #!/usr/bin/python2.7
 # -*- coding: utf-8 -*-
-
 import scrapy
 from scrapy.http import Request
 import time
+from uuid import uuid4
 import json
 import logging
 from scrapy.spiders import CrawlSpider,Rule
 from scrapy.linkextractors import LinkExtractor
 from ..items import HomelandItem
 from ..models.filter_url import FilterUrl
-import re
-from ..items import XfjyItemItem,XfjyArticleItem
+from ..items import XfjyItemItem,XfjyArticleItem,ImageItem
 from scrapy.loader import ItemLoader
 
 class XfjySpider(CrawlSpider):
@@ -55,6 +54,8 @@ class XfjySpider(CrawlSpider):
         self.filter = FilterUrl("xfjy_article_url")
         self.increment = increment
 
+        self.order = 1       # 用于存放block_type和index
+
     def parse_index(self, response):
         url = response.urljoin(response.url)
         if url != "http://xfjy.chd.edu.cn/":
@@ -77,6 +78,8 @@ class XfjySpider(CrawlSpider):
             self.log("此版块爬取结束")
 
     def _article_requests(self,response):
+        index = self.order
+
         request_list = []  # 用来存放返回的request对象
         loader = ItemLoader(item=XfjyItemItem(), response=response)
         loader.add_xpath("tags_list", "string(//div[@class='weizhi']//td)")
@@ -85,6 +88,7 @@ class XfjySpider(CrawlSpider):
 
         # 解析出文章title，date，url，并且进行文章爬取
         tr_tags = response.xpath("//div[@class='main_nei_you_baio_content']//tr[@height='20']")
+        self.order = self.order + len(tr_tags)
         for tr_tag in tr_tags:
             # 提取文章的url,并且拼接为完整的链接
             url = tr_tag.xpath(".//a//@href").extract_first()
@@ -111,11 +115,12 @@ class XfjySpider(CrawlSpider):
             exist = self.filter.filter(url)
             if not exist:
                 request = Request(url,
-                                  meta={"title": title, "date": date, "tags_list": tags_list, "type": "article"},
-                                  callback=self.parse_article
+                                  meta={"title": title, "date": date, "tags_list": tags_list, "type": "article","index":index},
+                                  callback=self.parse_article,
                                   )
                 request_list.append(request)
-            return request_list
+                index += 1
+        return request_list
 
     def parse_item(self, response):
         '''
@@ -140,7 +145,6 @@ class XfjySpider(CrawlSpider):
             yield self._next_request(response,start_url)
 
     def parse_article(self, response):
-        print("进入article")
         loader = ItemLoader(item=XfjyArticleItem(),response=response)
 
         article_url = response.url
@@ -148,7 +152,14 @@ class XfjySpider(CrawlSpider):
         # date = response.meta["date"]
         tags_list = response.meta["tags_list"]
         block_type = ",".join(tags_list)
+
+        # 暂时attachments放在这里
         attchments = response.xpath("//div[@class='main_nei_you_baio_content']//span//a")
+        names_urls = [(attchment.xpath(".//span//text()").extract_first(), attchment.xpath(".//@href").extract_first()) for attchment in attchments]
+        name_url = {name: response.urljoin(url) for name, url in names_urls}
+        attchments= json.dumps(name_url, ensure_ascii=False)
+
+        index = response.meta.get("index")
 
         loader.add_value("article_url", article_url)
         loader.add_value("title",title)
@@ -159,9 +170,34 @@ class XfjySpider(CrawlSpider):
         loader.add_value("content",response.xpath("//div[@class='main_nei_you_baio_content']//td[@class='contentstyle44003']"))
         loader.add_xpath("img", "//div[@class='main_nei_you_baio_content']//td[@class='contentstyle44003']//@src")
         loader.add_xpath("detail_time","//div[@class='main_nei_you_baio_content']//span[@class='timestyle44003']//text()")
+        loader.add_value("index",index)
 
-        print(loader.load_item())
+        imgs = loader.get_collected_values("img")
+        if imgs:
+            for img in imgs:
+                if "http" in img:
+                    yield Request(img,callback=self.parse_img,dont_filter=True,meta={"type":"image","article_url":response.url})
 
+        yield loader.load_item()
+
+    def parse_img(self, response):
+        image_item = ImageItem()
+        name = self.dispose_url(response.url)
+
+        image_item["img"] = response.body
+        image_item["name"] = name
+        image_item["article_url"] = response.meta.get("article_url")
+        image_item["image_url"] = response.url
+
+        if not response.body:
+            yield Request(response.url, callback=self.parse_img, dont_filter=True,
+                          meta={"type": "image", "article_url": image_item["article_url"]})
+        yield image_item
+
+    def dispose_url(self,url):
+        name = url.split("/")[-1]
+        name = name.split("=")[-1]
+        return name
 
 
 

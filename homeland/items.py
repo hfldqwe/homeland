@@ -11,6 +11,8 @@ from scrapy.loader.processors import TakeFirst,MapCompose,Join
 import time
 import json
 
+class OrderItem(scrapy.Item):
+    index = scrapy.Field(output_processor=TakeFirst())
 
 def dispose_time(time_str):
     tupletime = time.strptime(time_str,'发布时间：%Y-%M-%d')
@@ -29,7 +31,7 @@ def urljoin_content(content,loader_context):
         content = content.replace(img_link, response.urljoin(img_link))
     return content
 
-class HomelandItem(scrapy.Item):
+class HomelandItem(OrderItem):
     # define the fields for your item here like:
     # name = scrapy.Field()
 
@@ -44,14 +46,14 @@ class HomelandItem(scrapy.Item):
     power = scrapy.Field()                  # 允许谁看,权限
     tags_list = scrapy.Field()              # 这个专门用于tags表的标签
 
-class OfficialItem(scrapy.Item):
+class OfficialItem(OrderItem):
     block_type = scrapy.Field(output_processor=Join())
     title = scrapy.Field(output_processor=TakeFirst())
     author = scrapy.Field(output_processor=TakeFirst())
     content = scrapy.Field(input_processor=MapCompose(urljoin_content), output_processor=TakeFirst())
     detail_time = scrapy.Field(input_processor=MapCompose(str.strip,dispose_time) , output_processor=TakeFirst())
     article_url = scrapy.Field(output_processor=TakeFirst())
-    img = scrapy.Field(input_processor=MapCompose(urljoin_url),output_processor=TakeFirst())
+    img = scrapy.Field(input_processor=MapCompose(urljoin_url))
     power = scrapy.Field(output_processor=TakeFirst())  # 允许谁看,权限
     tags_list = scrapy.Field()  # 这个专门用于tags表的标签
 
@@ -71,19 +73,19 @@ def date(date):
     date = int(time.mktime(time.strptime("".join(date.split()), "%Y年%m月%d日")))
     return date
 
-def xfjy_attachments_out(attchments,context):
-    response = context.get("response")
-    names_urls = [(attchment.xpath(".//span//text()").extract_first(), attchment.xpath(".//@href").extract_first()) for
-                  attchment in attchments]
-    name_url = {name: response.urljoin(url) for name, url in names_urls}
-    return json.dumps(name_url, ensure_ascii=False)
+# def xfjy_attachments_out(attchments,context):
+#     response = context.get("response")
+#     names_urls = [(attchment.xpath(".//span//text()").extract_first(), attchment.xpath(".//@href").extract_first()) for
+#                   attchment in attchments]
+#     name_url = {name: response.urljoin(url) for name, url in names_urls}
+#     return json.dumps(name_url, ensure_ascii=False)
 
 def xfjy_detail_time_in(detail_time):
     detail_time = "".join(detail_time.split())
     detail_time = int(time.mktime(time.strptime(detail_time, "%Y-%m-%d%H:%M")))
     return detail_time
 
-class XfjyItemItem(scrapy.Item):
+class XfjyItemItem(OrderItem):
     tags_list = scrapy.Field(input_processor=MapCompose(dispose_tags_list))
     articel_url = scrapy.Field(input_processor=MapCompose(urljoin_url) , output_processor=TakeFirst())
     title = scrapy.Field(input_processor=MapCompose(dispose_title), output_processor=TakeFirst())
@@ -91,17 +93,24 @@ class XfjyItemItem(scrapy.Item):
     next_url = scrapy.Field(input_processor=MapCompose(urljoin_url), output_processor=TakeFirst())
     amount = scrapy.Field()
 
-class XfjyArticleItem(scrapy.Item):
+class XfjyArticleItem(OrderItem):
     block_type = scrapy.Field(output_processor=Join())
     title = scrapy.Field(output_processor=TakeFirst())
     author = scrapy.Field(input_processor=MapCompose(lambda author:"".join(author.split())),output_processor=TakeFirst())
     content = scrapy.Field(input_processor=MapCompose(urljoin_content), output_processor=TakeFirst())
     detail_time = scrapy.Field(input_processor=MapCompose(str.strip,xfjy_detail_time_in) , output_processor=TakeFirst())
     article_url = scrapy.Field(output_processor=TakeFirst())
-    img = scrapy.Field(input_processor=MapCompose(urljoin_url),output_processor=TakeFirst())
+    img = scrapy.Field(input_processor=MapCompose(urljoin_url))
     tags_list = scrapy.Field()  # 这个专门用于tags表的标签
-    attch_name_url = scrapy.Field(output_processor=xfjy_attachments_out)
+
+    attch_name_url = scrapy.Field(output_processor=TakeFirst())
     power = scrapy.Field(output_processor=TakeFirst())  # 允许谁看,权限
+
+class ImageItem(scrapy.Item):
+    name = scrapy.Field()
+    img = scrapy.Field()
+    article_url = scrapy.Field()
+    image_url = scrapy.Field()
 
 
 

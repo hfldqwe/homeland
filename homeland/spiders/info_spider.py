@@ -1,19 +1,24 @@
 # -*- coding: utf-8 -*-
 import scrapy
+import re
 from scrapy.http import Request
 from scrapy import FormRequest
+from scrapy.shell import inspect_response
+from scrapy.http.cookies import CookieJar
 import re
+import time
 import logging
 import json
 import time
 
-from ..items import HomelandItem
+from ..items import HomelandItem,ImageItem
 from ..models.filter_url import FilterUrl
+
+cookiejar = CookieJar()
 
 class InfoSpider(scrapy.Spider):
     name = 'info'
     allowed_domains = ['portal.chd.edu.cn','ids.chd.edu.cn']
-    start_urls = ['http://ids.chd.edu.cn/authserver/login?service=http%3A%2F%2Fportal.chd.edu.cn%2F']
 
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
@@ -24,6 +29,7 @@ class InfoSpider(scrapy.Spider):
         super(InfoSpider,self).__init__(*args,**kwargs)
         self.username = username
         self.password = password
+
         self.source_type = source_type
         if self.source_type == "info":
             self.power = "all"
@@ -39,7 +45,14 @@ class InfoSpider(scrapy.Spider):
 
         self.increment = increment
 
-    def parse(self, response):
+        self.order = 1   # 键是block_type，值为index
+
+    def start_requests(self):
+        yield Request(url=self.login_url,dont_filter=True,callback=self.login,
+                      meta={"type":"start",
+                            "start_url":self.login_url})
+
+    def _login(self,response):
         lt = response.xpath("//input[@name='lt']//@value").extract_first()
         dllt = response.xpath("//input[@name='dllt']//@value").extract_first()
         execution = response.xpath("//input[@name='execution']//@value").extract_first()
@@ -48,64 +61,67 @@ class InfoSpider(scrapy.Spider):
         btn = ""
 
         formdata = {
-            "username":self.username,
-            "password":self.password,
-            "lt":lt,
-            "dllt":dllt,
-            "execution":execution,
-            "_eventId":_eventId,
-            "rmShown":rmShown,
-            "btn":btn,
+            "username": self.username,
+            "password": self.password,
+            "lt": lt,
+            "dllt": dllt,
+            "execution": execution,
+            "_eventId": _eventId,
+            "rmShown": rmShown,
+            "btn": btn,
         }
-        yield FormRequest("http://ids.chd.edu.cn/authserver/login?service=http%3A%2F%2Fportal.chd.edu.cn%2F",
-                          formdata = formdata,
-                          callback=self.spider_news,
-                          meta={'pageIndex':0},
+        return FormRequest("http://ids.chd.edu.cn/authserver/login?service=http%3A%2F%2Fportal.chd.edu.cn%2F",
+                          formdata=formdata,
+                          callback=self.parse_item,
                           )
 
-    def spider_news(self,response):
-        pageIndex = response.meta.get("pageIndex",None)
-        next_url = "http://portal.chd.edu.cn/detach.portal?pageIndex={}&pageSize=&.pmn=view&.ia=false&action=bulletinsMoreView&search=true&groupid=all&.pen=pe65".format(
-            pageIndex + 1)
+    def login(self, response):
+        login_request = self._login(response=response)
+        yield login_request
 
-        if pageIndex == 0:
-            yield Request(next_url,callback=self.spider_news,meta={'pageIndex':1},dont_filter=True)
-        else:
-
-            # 这部分用于提取news的链接并且进行爬取
-            article_urls = response.xpath(
-                "//ul[@class='rss-container clearFix']//li//a[@class='rss-title']//@href").extract()
-            for article_url in article_urls:
-                article_url = response.urljoin(article_url)
-                if self.filter.filter(article_url):
-                    self.repetition.append(article_url)
-                else:
-                    yield Request(article_url, callback=self.parse_article, meta={"type": "article"})
-
-            # 进行下一页的爬取，或者重复首页增量爬取
-            if self.repetition and self.increment:
-                self.repetition = []  # 使repetition复原
-                self.log("增量爬取",level=logging.DEBUG)
-                interval_time = time.time() - self.interval_time
-                if interval_time >= 7200:
-                    yield Request(self.login_url,callback=self.parse,dont_filter=True)
-                yield Request(next_url, callback=self.spider_news, dont_filter=True,
-                              meta={'pageIndex': 0})
+    def _verify_login(self,response):
+        try:
+            username = response.xpath("//table[@class='composer_header']//div[@class='composer']//li")[1].xpath(".//span//text()").extract_first()
+            username = re.compile("\d+").findall(username)[0]
+            if username == self.username:
+                self.log("登陆成功")
+                return True
             else:
-                info = response.xpath("//div[@class='pagination-info clearFix']//span//text()").extract_first()
-                if info:
-                    info = re.compile("\d*/\d*").findall(info)[0]
-                    news_amount, page_amount = info.split("/")
+                self.log("登陆失败",level=logging.ERROR)
+                return False
+        except:
+            return False
 
-                    if int(page_amount) > pageIndex:
-                        pageIndex += 1
-                        yield Request(next_url, callback=self.spider_news, meta={'pageIndex': pageIndex})
-                    else:
-                        self.log("信息门户爬取结束，爬取页数{}".format(pageIndex), level=logging.WARNING)
+    def verify_login(self,response):
+        ''' 若没有登陆状态，则返回一个登陆的请求。否则，返回None '''
+        login_status = self._verify_login(response=response) if "login" in response.url else True
+        if login_status:
+            return None
+        else:
+            return self._login(response=response)
 
-                else:
-                    self.log("没有找到文章数和页数，版块链接：%s" % response.url,level=logging.ERROR)
-                    yield
+    def parse_item(self,response):
+        start_url = response.meta.get("start_url")
+
+        login_request = self.verify_login(response=response)
+        if not login_request:
+            yield login_request
+
+        # 如果request_list不为空，那么将进行request_list中的request放入队列进行爬取
+        # 否则重复开始页面爬取，直到有新的文章。
+        request_list = self._article_requests(response)
+        if not request_list and self.increment:
+            self.log("增量爬取")
+            yield Request(url=start_url,callback=self.parse,dont_filter=True,
+                          meta={
+                              "type": "start",
+                              "start_url":start_url,
+                          })
+        else:
+            for request in request_list:
+                yield request
+
+            yield self._next_request(response,start_url)
 
     def parse_article(self,response):
         item = HomelandItem()
@@ -124,7 +140,7 @@ class InfoSpider(scrapy.Spider):
         content = response.xpath("//div[@class='bulletin-content']")
         if content:
             img_links = content[0].xpath(".//@src").extract()
-            img = [response.urljoin(img_link) for img_link in img_links]
+            imgs = [response.urljoin(img_link) for img_link in img_links]
             content = content.extract_first()
             for img_link in img_links:
                 content = content.replace(img_link,response.urljoin(img_link))
@@ -142,16 +158,87 @@ class InfoSpider(scrapy.Spider):
         item["attch_name_url"] = attachments
         item["author"] = author
         item["content"] = content
-        if img:
-            item["img"] = img[0].replace("///","//")
+        if imgs:
+            item["img"] = imgs
         else:
-            item["img"] = ""
+            item["img"] = []
         item["detail_time"] = creat_time
         item["article_url"] = response.url
         item["power"] = self.power
 
+        item["index"] = response.meta.get("index")
+
+        if imgs:
+            cookiejar.extract_cookies(response, response.request)
+            for img in imgs:
+                if "http" in img:
+                    yield Request(img, callback=self.parse_img, dont_filter=True,
+                                  meta={"type": "image", "article_url": response.url,"cookiejar":cookiejar})
+
         yield item
 
+    def parse_img(self, response):
+        image_item = ImageItem()
+        name = self.dispose_url(response.url)
 
+        image_item["img"] = response.body
+        image_item["name"] = name
+        image_item["article_url"] = response.meta.get("article_url")
+        image_item["image_url"] = response.url
+
+        if not response.body:
+            yield Request(response.url, callback=self.parse_img, dont_filter=True,
+                          meta={"type": "image", "article_url": image_item["article_url"],"cookiejar":response.meta.get("cookiejar")})
+
+        yield image_item
+
+    def dispose_url(self,url):
+        name = url.split("/")[-1]
+        name = name.split("=")[-1]
+        return name
+
+    def _next_request(self,response,start_url):
+        pageIndex = response.meta.get("pageIndex", 0) + 1
+        next_url = "http://portal.chd.edu.cn/detach.portal?pageIndex={}&pageSize=&.pmn=view&.ia=false&action=bulletinsMoreView&search=true&groupid=all&.pen=pe65".format(
+            pageIndex)
+
+        # 用来判断是否要继续爬取
+        info = response.xpath("//div[@class='pagination-info clearFix']//span//text()").extract_first()
+        if info:
+            info = re.compile("\d*/\d*").findall(info)[0]
+            news_amount, page_amount = info.split("/")
+            if int(page_amount) >= pageIndex:
+                return Request(url=next_url, callback=self.parse_item,
+                               meta={
+                                   "type": "item",
+                                   "start_url": start_url,
+                                   "pageIndex":pageIndex
+                               })
+            else:
+                self.log("信息门户爬取结束，爬取页数{}".format(pageIndex), level=logging.WARNING)
+                return {"type":1,"index":0}
+
+        else:
+            self.log("没有找到文章数和页数，版块链接：%s" % response.url, level=logging.ERROR)
+            return {"type": 1, "index": 0}
+
+    def _article_requests(self,response):
+        index = self.order
+        request_list = []
+
+        article_urls = response.xpath("//ul[@class='rss-container clearFix']//li//a[@class='rss-title']//@href").extract()
+        self.order = self.order + len(article_urls)
+        for article_url in article_urls:
+            article_url = response.urljoin(article_url)
+            exist = self.filter.filter(article_url)
+            if not exist:
+                request = Request(article_url, callback=self.parse_article,
+                                  meta={
+                                      "type": "article",
+                                      "index":index,
+                                  })
+                request_list.append(request)
+                index += 1
+        return request_list
 
 

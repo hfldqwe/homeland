@@ -64,6 +64,8 @@ class OfficialSpider(scrapy.Spider):
             for request in request_list:
                 yield request
 
+            self.order += len(request_list)
+
             yield self._next_request(response,start_url)
 
     def parse_article(self,response):
@@ -126,7 +128,6 @@ class OfficialSpider(scrapy.Spider):
 
         # 提取出标题，日期和url
         title_date_url = response.xpath("//div[@id='wp_news_w9']//a")
-        self.order += self.order + len(title_date_url)
         title_date_url = [(*(i.xpath(".//span//text()").extract()), i.xpath(".//@href").extract_first()) for i in
                           title_date_url]
         # 爬取tag

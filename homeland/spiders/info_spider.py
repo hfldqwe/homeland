@@ -121,6 +121,8 @@ class InfoSpider(scrapy.Spider):
             for request in request_list:
                 yield request
 
+            self.order += len(request_list)
+
             yield self._next_request(response,start_url)
 
     def parse_article(self,response):
@@ -227,7 +229,6 @@ class InfoSpider(scrapy.Spider):
         request_list = []
 
         article_urls = response.xpath("//ul[@class='rss-container clearFix']//li//a[@class='rss-title']//@href").extract()
-        self.order = self.order + len(article_urls)
         for article_url in article_urls:
             article_url = response.urljoin(article_url)
             exist = self.filter.filter(article_url)
@@ -239,6 +240,7 @@ class InfoSpider(scrapy.Spider):
                                   })
                 request_list.append(request)
                 index += 1
+
         return request_list
 
 

@@ -133,14 +133,6 @@ class HomelandPipeline:
         self.filter_url = FilterUrl(name)
         self.data = list()
 
-    # def process_item(self, item, spider):
-    #     index_items = item
-    #     if not index_items:
-    #         return
-    #     else:
-    #         for index,item in index_items:
-    #             self.process_item(item=item,spider=spider)
-
     def process_item(self, item, spider):
         if not item:
             return None
@@ -192,20 +184,38 @@ class HomelandPipeline:
             "index":item.get("index")
         }
 
-        self.filter_url.add(article_url)
         self.data.append(kwargs_dict)
 
-    def close_spider(self,spider):
-        # import time
+    def write_items(self):
         data = sorted(self.data,key=lambda x:x["index"],reverse=True)
-        # print(len(data))
         for kwargs_dict in data:
             try:
                 kwargs_dict.pop("index")
+
+                article_url = kwargs_dict.get("article_url")
+                self.filter_url.add(article_url)
+
                 passed = self.yiban.insert_mysql(kwargs_dict=kwargs_dict)
                 if passed:
                     self.logger.debug("插入数据库成功")
-                    pass#self.filter_url.add(article_url)
+                else:
+                    self.logger.error("url不在过滤池中，文章却保存到了数据库")
+            except BaseException as e:
+                self.logger.error(str(e))
+                self.logger.error("数据库交互出现了错误")
+
+    def close_spider(self,spider):
+        data = sorted(self.data,key=lambda x:x["index"],reverse=True)
+        for kwargs_dict in data:
+            try:
+                kwargs_dict.pop("index")
+
+                article_url = kwargs_dict.get("article_url")
+                self.filter_url.add(article_url)
+
+                passed = self.yiban.insert_mysql(kwargs_dict=kwargs_dict)
+                if passed:
+                    self.logger.debug("插入数据库成功")
                 else:
                     self.logger.error("url不在过滤池中，文章却保存到了数据库")
             except BaseException as e:

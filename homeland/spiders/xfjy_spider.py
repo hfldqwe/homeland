@@ -88,7 +88,6 @@ class XfjySpider(CrawlSpider):
 
         # 解析出文章title，date，url，并且进行文章爬取
         tr_tags = response.xpath("//div[@class='main_nei_you_baio_content']//tr[@height='20']")
-        self.order = self.order + len(tr_tags)
         for tr_tag in tr_tags:
             # 提取文章的url,并且拼接为完整的链接
             url = tr_tag.xpath(".//a//@href").extract_first()
@@ -141,6 +140,8 @@ class XfjySpider(CrawlSpider):
         else:
             for request in request_list:
                 yield request
+
+            self.order += len(request_list)
 
             yield self._next_request(response,start_url)
 

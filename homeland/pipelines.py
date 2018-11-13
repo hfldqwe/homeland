@@ -18,7 +18,7 @@ from .utils.img_qiniu import UploadImage
 
 from scrapy.exceptions import CloseSpider
 
-from .items import ImageItem
+from .items import ImageItem,WriteSignalItem
 
 from scrapy import signals
 
@@ -78,6 +78,7 @@ class ImagePipeline:
     def process_item(self, item, spider):
         if isinstance(item, ImageItem):
             name = item.get("name")
+            name = self.dispose_url(name)
             image = item.get("img")
             article_url = item.get("article_url")
             image_url = item.get("image_url")
@@ -86,6 +87,8 @@ class ImagePipeline:
             else:
                 logger.error("没有解析到图片,文章地址：{}，图片地址：{}".format(article_url,image_url))
             return None
+        elif isinstance(item,WriteSignalItem):
+            return item
         else:
             imgs = item.get("img")
             content = item.get("content")
@@ -104,7 +107,7 @@ class ImagePipeline:
 
     def dispose_url(self,url):
         name = url.split("/")[-1]
-        name = name.split("=")[-1]
+        name = "weappnews/" + name.split("=")[-1]
         return name
 
     def upload_image(self,img,name):
@@ -114,8 +117,11 @@ class HomelandPipeline:
     def open_spider(self,spider):
         self.logger = logging.getLogger()
         if isinstance(spider,InfoSpider):
-            name = "info_article_url"
             self.source_type = spider.source_type
+            if self.source_type == "info":
+                name = "info_article_url"
+            else:
+                name = "infoteacher_article_url"
             self.channel_id = 7
         elif isinstance(spider,XfjySpider):
             name = "xfjy_article_url"
@@ -134,6 +140,10 @@ class HomelandPipeline:
         self.data = list()
 
     def process_item(self, item, spider):
+        if isinstance(item,WriteSignalItem):
+            self.write_items()
+            return
+
         if not item:
             return None
 
@@ -187,38 +197,41 @@ class HomelandPipeline:
         self.data.append(kwargs_dict)
 
     def write_items(self):
-        data = sorted(self.data,key=lambda x:x["index"],reverse=True)
-        for kwargs_dict in data:
-            try:
-                kwargs_dict.pop("index")
+        if self.data:
+            data = sorted(self.data,key=lambda x:x["index"],reverse=True)
+            for kwargs_dict in data:
+                try:
+                    kwargs_dict.pop("index")
 
-                article_url = kwargs_dict.get("article_url")
-                self.filter_url.add(article_url)
+                    article_url = kwargs_dict.get("article_url")
+                    self.filter_url.add(article_url)
 
-                passed = self.yiban.insert_mysql(kwargs_dict=kwargs_dict)
-                if passed:
-                    self.logger.debug("插入数据库成功")
-                else:
-                    self.logger.error("url不在过滤池中，文章却保存到了数据库")
-            except BaseException as e:
-                self.logger.error(str(e))
-                self.logger.error("数据库交互出现了错误")
+                    passed = self.yiban.insert_mysql(kwargs_dict=kwargs_dict)
+                    if passed:
+                        self.logger.debug("插入数据库成功")
+                    else:
+                        self.logger.error("url不在过滤池中，文章却保存到了数据库")
+                except BaseException as e:
+                    self.logger.error(str(e))
+                    self.logger.error("数据库交互出现了错误")
 
     def close_spider(self,spider):
-        data = sorted(self.data,key=lambda x:x["index"],reverse=True)
-        for kwargs_dict in data:
-            try:
-                kwargs_dict.pop("index")
+        print("进入close")
+        if self.data:
+            data = sorted(self.data,key=lambda x:x["index"],reverse=True)
+            for kwargs_dict in data:
+                try:
+                    kwargs_dict.pop("index")
 
-                article_url = kwargs_dict.get("article_url")
-                self.filter_url.add(article_url)
+                    article_url = kwargs_dict.get("article_url")
+                    self.filter_url.add(article_url)
 
-                passed = self.yiban.insert_mysql(kwargs_dict=kwargs_dict)
-                if passed:
-                    self.logger.debug("插入数据库成功")
-                else:
-                    self.logger.error("url不在过滤池中，文章却保存到了数据库")
-            except BaseException as e:
-                self.logger.error(str(e))
-                self.logger.error("数据库交互出现了错误")
+                    passed = self.yiban.insert_mysql(kwargs_dict=kwargs_dict)
+                    if passed:
+                        self.logger.debug("插入数据库成功")
+                    else:
+                        self.logger.error("url不在过滤池中，文章却保存到了数据库")
+                except BaseException as e:
+                    self.logger.error(str(e))
+                    self.logger.error("数据库交互出现了错误")
 

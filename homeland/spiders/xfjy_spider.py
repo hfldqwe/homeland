@@ -10,7 +10,7 @@ from scrapy.spiders import CrawlSpider,Rule
 from scrapy.linkextractors import LinkExtractor
 from ..items import HomelandItem
 from ..models.filter_url import FilterUrl
-from ..items import XfjyItemItem,XfjyArticleItem,ImageItem
+from ..items import XfjyItemItem,XfjyArticleItem,ImageItem,WriteSignalItem
 from scrapy.loader import ItemLoader
 
 class XfjySpider(CrawlSpider):
@@ -128,10 +128,15 @@ class XfjySpider(CrawlSpider):
         :return:position,title_dates
         '''
         start_url = response.meta.get("start_url")
-        request_list = self._article_requests(response)
+        write_item = WriteSignalItem()
 
+        request_list = self._article_requests(response)
         if not request_list and self.increment:
             self.log("增量爬取")
+
+            write_item["write"] = True
+            yield write_item
+
             yield Request(url=start_url,callback=self.parse_item,dont_filter=True,
                           meta={
                               "type": "start",
@@ -183,10 +188,9 @@ class XfjySpider(CrawlSpider):
 
     def parse_img(self, response):
         image_item = ImageItem()
-        name = self.dispose_url(response.url)
 
         image_item["img"] = response.body
-        image_item["name"] = name
+        image_item["name"] = response.url
         image_item["article_url"] = response.meta.get("article_url")
         image_item["image_url"] = response.url
 
@@ -194,11 +198,6 @@ class XfjySpider(CrawlSpider):
             yield Request(response.url, callback=self.parse_img, dont_filter=True,
                           meta={"type": "image", "article_url": image_item["article_url"]})
         yield image_item
-
-    def dispose_url(self,url):
-        name = url.split("/")[-1]
-        name = name.split("=")[-1]
-        return name
 
 
 

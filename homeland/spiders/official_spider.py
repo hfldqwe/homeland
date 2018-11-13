@@ -5,7 +5,7 @@ import logging
 from scrapy.http import Request
 from scrapy.loader import ItemLoader
 from scrapy.loader.processors import MapCompose
-from ..items import OfficialItem,ImageItem
+from ..items import OfficialItem,ImageItem,WriteSignalItem
 import time
 from ..models.filter_url import FilterUrl
 
@@ -21,7 +21,8 @@ class OfficialSpider(scrapy.Spider):
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
         increment = crawler.settings.get("INCREMENT_CRAWL",False)
-        return cls(increment=increment,*args,**kwargs)
+        spider = super().from_crawler(crawler, increment=increment, *args, **kwargs)
+        return spider
 
     def __init__(self,increment=False,*args,**kwargs):
         self.increment = increment
@@ -48,6 +49,7 @@ class OfficialSpider(scrapy.Spider):
                           })
 
     def parse(self,response):
+        write_item = WriteSignalItem()
         start_url = response.meta.get("start_url")
 
         # 如果request_list不为空，那么将进行request_list中的request放入队列进行爬取
@@ -55,6 +57,10 @@ class OfficialSpider(scrapy.Spider):
         request_list = self._article_requests(response)
         if not request_list and self.increment:
             self.log("增量爬取")
+
+            write_item["write"] = True
+            yield write_item
+
             yield Request(url=start_url,callback=self.parse,dont_filter=True,
                           meta={
                               "type": "start",
@@ -103,10 +109,9 @@ class OfficialSpider(scrapy.Spider):
 
     def parse_img(self, response):
         image_item = ImageItem()
-        name = self.dispose_url(response.url)
 
         image_item["img"] = response.body
-        image_item["name"] = name
+        image_item["name"] = response.url
         image_item["article_url"] = response.meta.get("article_url")
         image_item["image_url"] = response.url
 
@@ -117,10 +122,6 @@ class OfficialSpider(scrapy.Spider):
 
         yield image_item
 
-    def dispose_url(self,url):
-        name = url.split("/")[-1]
-        name = name.split("=")[-1]
-        return name
 
     def _article_requests(self,response):
         index = self.order

@@ -11,7 +11,7 @@ import logging
 import json
 import time
 
-from ..items import HomelandItem,ImageItem
+from ..items import HomelandItem,ImageItem,WriteSignalItem
 from ..models.filter_url import FilterUrl
 
 cookiejar = CookieJar()
@@ -20,10 +20,14 @@ class InfoSpider(scrapy.Spider):
     name = 'info'
     allowed_domains = ['portal.chd.edu.cn','ids.chd.edu.cn']
 
+    custom_settings = {
+    }
+
     @classmethod
     def from_crawler(cls, crawler, *args, **kwargs):
         increment = crawler.settings.get("INCREMENT_CRAWL",False)
-        return cls(increment=increment,*args,**kwargs)
+        spider = super().from_crawler(crawler, increment=increment, *args, **kwargs)
+        return spider
 
     def __init__(self,username,password,source_type,increment=False,*args,**kwargs):
         super(InfoSpider,self).__init__(*args,**kwargs)
@@ -33,15 +37,19 @@ class InfoSpider(scrapy.Spider):
         self.source_type = source_type
         if self.source_type == "info":
             self.power = "all"
+            redis_name = "info_article_url"
         elif self.source_type == "info-teacher":
             self.power = "teacher"
+            redis_name = "infoteacher_article_url"
         else:
             self.power = "all"
+            redis_name = "info_article_url"
 
         self.login_url = 'http://ids.chd.edu.cn/authserver/login?service=http%3A%2F%2Fportal.chd.edu.cn%2F'
+        self.start_url = "http://portal.chd.edu.cn/detach.portal?.pmn=view&.ia=false&action=bulletinsMoreView&search=true&.f=f40571&.pen=pe65&groupid=all"
         self.interval_time = time.time()
         self.repetition = []
-        self.filter = FilterUrl("info_article_url")
+        self.filter = FilterUrl(redis_name)
 
         self.increment = increment
 
@@ -50,7 +58,7 @@ class InfoSpider(scrapy.Spider):
     def start_requests(self):
         yield Request(url=self.login_url,dont_filter=True,callback=self.login,
                       meta={"type":"start",
-                            "start_url":self.login_url})
+                            "start_url":self.start_url})
 
     def _login(self,response):
         lt = response.xpath("//input[@name='lt']//@value").extract_first()
@@ -72,7 +80,7 @@ class InfoSpider(scrapy.Spider):
         }
         return FormRequest("http://ids.chd.edu.cn/authserver/login?service=http%3A%2F%2Fportal.chd.edu.cn%2F",
                           formdata=formdata,
-                          callback=self.parse_item,
+                          callback=self.parse_item,dont_filter=True,
                           )
 
     def login(self, response):
@@ -101,18 +109,26 @@ class InfoSpider(scrapy.Spider):
             return self._login(response=response)
 
     def parse_item(self,response):
-        start_url = response.meta.get("start_url")
+        start_url = self.start_url
+        write_item = WriteSignalItem()
 
         login_request = self.verify_login(response=response)
         if not login_request:
             yield login_request
+
+        if "http://portal.chd.edu.cn/" == response.url:
+            yield Request(start_url,callback=self.parse_item,dont_filter=True)
 
         # 如果request_list不为空，那么将进行request_list中的request放入队列进行爬取
         # 否则重复开始页面爬取，直到有新的文章。
         request_list = self._article_requests(response)
         if not request_list and self.increment:
             self.log("增量爬取")
-            yield Request(url=start_url,callback=self.parse,dont_filter=True,
+
+            write_item["write"] = True
+            yield write_item
+
+            yield Request(url=start_url,callback=self.parse_item,dont_filter=True,
                           meta={
                               "type": "start",
                               "start_url":start_url,
@@ -171,33 +187,26 @@ class InfoSpider(scrapy.Spider):
         item["index"] = response.meta.get("index")
 
         if imgs:
-            cookiejar.extract_cookies(response, response.request)
             for img in imgs:
                 if "http" in img:
                     yield Request(img, callback=self.parse_img, dont_filter=True,
-                                  meta={"type": "image", "article_url": response.url,"cookiejar":cookiejar})
+                                  meta={"type": "image", "article_url": response.url})
 
         yield item
 
     def parse_img(self, response):
         image_item = ImageItem()
-        name = self.dispose_url(response.url)
 
         image_item["img"] = response.body
-        image_item["name"] = name
+        image_item["name"] = response.url
         image_item["article_url"] = response.meta.get("article_url")
         image_item["image_url"] = response.url
 
         if not response.body:
             yield Request(response.url, callback=self.parse_img, dont_filter=True,
-                          meta={"type": "image", "article_url": image_item["article_url"],"cookiejar":response.meta.get("cookiejar")})
+                          meta={"type": "image", "article_url": image_item["article_url"]})
 
         yield image_item
-
-    def dispose_url(self,url):
-        name = url.split("/")[-1]
-        name = name.split("=")[-1]
-        return name
 
     def _next_request(self,response,start_url):
         pageIndex = response.meta.get("pageIndex", 0) + 1

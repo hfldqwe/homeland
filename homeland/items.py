@@ -112,6 +112,9 @@ class ImageItem(scrapy.Item):
     article_url = scrapy.Field()
     image_url = scrapy.Field()
 
+class WriteSignalItem(scrapy.Item):
+    write = scrapy.Field()
+
 
 
 

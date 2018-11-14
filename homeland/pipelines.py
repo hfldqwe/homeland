@@ -191,9 +191,8 @@ class HomelandPipeline:
             # tags表
             'tags_list' : item.get('tags_list'),
 
-            "index":item.get("index")
+            "index":item.get("index"),
         }
-
         self.data.append(kwargs_dict)
 
     def write_items(self):
@@ -204,34 +203,19 @@ class HomelandPipeline:
                     kwargs_dict.pop("index")
 
                     article_url = kwargs_dict.get("article_url")
-                    self.filter_url.add(article_url)
 
                     passed = self.yiban.insert_mysql(kwargs_dict=kwargs_dict)
                     if passed:
+                        self.filter_url.add(article_url)
                         self.logger.debug("插入数据库成功")
                     else:
                         self.logger.error("url不在过滤池中，文章却保存到了数据库")
+                    self.data.remove(kwargs_dict)
                 except BaseException as e:
                     self.logger.error(str(e))
                     self.logger.error("数据库交互出现了错误")
 
     def close_spider(self,spider):
-        print("进入close")
-        if self.data:
-            data = sorted(self.data,key=lambda x:x["index"],reverse=True)
-            for kwargs_dict in data:
-                try:
-                    kwargs_dict.pop("index")
-
-                    article_url = kwargs_dict.get("article_url")
-                    self.filter_url.add(article_url)
-
-                    passed = self.yiban.insert_mysql(kwargs_dict=kwargs_dict)
-                    if passed:
-                        self.logger.debug("插入数据库成功")
-                    else:
-                        self.logger.error("url不在过滤池中，文章却保存到了数据库")
-                except BaseException as e:
-                    self.logger.error(str(e))
-                    self.logger.error("数据库交互出现了错误")
+        self.write_items()
+        return
 

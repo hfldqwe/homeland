@@ -15,7 +15,6 @@ class OfficialSpider(scrapy.Spider):
     allowed_domains = ['news.chd.edu.cn']
 
     custom_settings = {
-        'DOWNLOAD_DELAY': 0.1,
     }
 
     @classmethod
@@ -62,6 +61,7 @@ class OfficialSpider(scrapy.Spider):
             yield write_item
 
             yield Request(url=start_url,callback=self.parse,dont_filter=True,
+                          priority=-1,
                           meta={
                               "type": "start",
                               "start_url":start_url,

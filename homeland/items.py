@@ -10,12 +10,13 @@ from scrapy.loader import ItemLoader
 from scrapy.loader.processors import TakeFirst,MapCompose,Join
 import time
 import json
+import re
 
 class OrderItem(scrapy.Item):
     index = scrapy.Field(output_processor=TakeFirst())
 
 def dispose_time(time_str):
-    tupletime = time.strptime(time_str,'发布时间：%Y-%M-%d')
+    tupletime = time.strptime(time_str,'发布时间：%Y-%m-%d')
     return int(time.mktime(tupletime))
 
 def urljoin_url(url,loader_context):
@@ -104,6 +105,27 @@ class XfjyArticleItem(OrderItem):
     tags_list = scrapy.Field()  # 这个专门用于tags表的标签
 
     attch_name_url = scrapy.Field(output_processor=TakeFirst())
+    power = scrapy.Field(output_processor=TakeFirst())  # 允许谁看,权限
+
+
+def yiban_detail_time_in(detail_time):
+    now = time.localtime()
+    if len(detail_time) <= 12:
+        detail_time = str(now.tm_year) + "-" + detail_time
+    time_tuple = time.strptime(detail_time,"%Y-%m-%d %H:%M")
+    return int(time.mktime(time_tuple))
+
+class YibanArticleItem(OrderItem):
+    block_type = scrapy.Field(output_processor=Join())
+    title = scrapy.Field(output_processor=TakeFirst())
+    author = ""
+    content = scrapy.Field(output_processor=TakeFirst())
+    detail_time = scrapy.Field(input_processor=MapCompose(str.strip, yiban_detail_time_in), output_processor=TakeFirst())
+    article_url = scrapy.Field(output_processor=TakeFirst())
+    img = scrapy.Field()
+    tags_list = scrapy.Field()  # 这个专门用于tags表的标签
+
+    attch_name_url = ""
     power = scrapy.Field(output_processor=TakeFirst())  # 允许谁看,权限
 
 class ImageItem(scrapy.Item):

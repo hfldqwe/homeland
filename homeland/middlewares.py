@@ -12,6 +12,7 @@ from scrapy.exceptions import IgnoreRequest,CloseSpider,DontCloseSpider
 from .spiders.info_spider import InfoSpider
 from .spiders.xfjy_spider import XfjySpider
 from .spiders.official_spider import OfficialSpider
+from .spiders.yiban_spider import YibanSpider
 
 
 class FilterRequestsMiddleware(object):
@@ -29,9 +30,11 @@ class FilterRequestsMiddleware(object):
             name = "xfjy_article_url"
         elif isinstance(spider,OfficialSpider):
             name = "official_article_url"
+        elif isinstance(spider,YibanSpider):
+            name = "yiban_article_url"
         else:
-            spider.log("没有找到启动的爬虫,pipelines无法加载，%s" % spider.__class__)
-            raise CloseSpider("没有找到启动的爬虫,pipelines无法加载，%s" % spider.__class__)
+            spider.log("没有找到启动的爬虫,FilterRequestsMiddleware无法加载，%s" % spider.__class__)
+            raise CloseSpider("没有找到启动的爬虫,FilterRequestsMiddleware无法加载，%s" % spider.__class__)
         self.filter_url = FilterUrl(name)
 
     def process_request(self,request,spider):

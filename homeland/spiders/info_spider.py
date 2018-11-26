@@ -129,6 +129,7 @@ class InfoSpider(scrapy.Spider):
             yield write_item
 
             yield Request(url=start_url,callback=self.parse_item,dont_filter=True,
+                          priority=-1,
                           meta={
                               "type": "start",
                               "start_url":start_url,

@@ -129,7 +129,7 @@ class YibanModel():
                 return False
             return True
         else:
-            sqlagr = "insert into fa_cms_tags set `name`='{}',archives='{}';".format(tag,"1")
+            sqlagr = "insert into fa_cms_tags set `name`='{}',archives='{}',nums={};".format(tag,archives_id,"1")
             row = self.cursor.execute(sqlagr)
             self.con.commit()
             if row == 0:

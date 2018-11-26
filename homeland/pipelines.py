@@ -13,6 +13,7 @@ import logging
 from .spiders.info_spider import InfoSpider
 from .spiders.xfjy_spider import XfjySpider
 from .spiders.official_spider import OfficialSpider
+from .spiders.yiban_spider import YibanSpider
 
 from .utils.img_qiniu import UploadImage
 
@@ -101,13 +102,16 @@ class ImagePipeline:
             else:
                 img = ""
 
-            item["img"] = img
+            item["img"] = img.replace("http","https")
             item["content"] = content
             return item
 
     def dispose_url(self,url):
         name = url.split("/")[-1]
-        name = "weappnews/" + name.split("=")[-1]
+        name_suffix = name.split("=")[-1]
+        if not name_suffix:
+            name_suffix = name.split("=")[-2]
+        name = "weappnews/" + name_suffix
         return name
 
     def upload_image(self,img,name):
@@ -131,6 +135,10 @@ class HomelandPipeline:
             name = "official_article_url"
             self.source_type = "official"
             self.channel_id = 4
+        elif isinstance(spider,YibanSpider):
+            name = "yiban_article_url"
+            self.source_type = "yiban"
+            self.channel_id = 3
         else:
             self.logger.error("没有找到启动的爬虫,pipelines无法加载，%s" % spider.__class__)
             raise CloseSpider("没有找到启动的爬虫,pipelines无法加载，%s" % spider.__class__)

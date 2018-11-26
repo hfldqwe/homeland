@@ -44,22 +44,28 @@ DOWNLOAD_DELAY = 3
 
 # Override the default request headers:
 DEFAULT_REQUEST_HEADERS = {
-   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-   'Accept-Language': 'en',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en',
     'User-Agent':'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36',
 }
 
 # Enable or disable spider middlewares
 # See https://doc.scrapy.org/en/latest/topics/spider-middleware.html
 SPIDER_MIDDLEWARES = {
-   'homeland.middlewares.HomelandSpiderMiddleware': 543,
+    'homeland.middlewares.HomelandSpiderMiddleware': 543,
+
+    # 'scrapy_splash.SplashDeduplicateArgsMiddleware': 100,
 }
 
 # Enable or disable downloader middlewares
 # See https://doc.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
-   'homeland.middlewares.HomelandDownloaderMiddleware': 544,
-   'homeland.middlewares.FilterRequestsMiddleware':600,
+    'homeland.middlewares.HomelandDownloaderMiddleware': 544,
+    'homeland.middlewares.FilterRequestsMiddleware':600,
+
+    # 'scrapy_splash.SplashCookiesMiddleware': 723,
+    # 'scrapy_splash.SplashMiddleware': 725,
+    # 'scrapy.downloadermiddlewares.httpcompression.HttpCompressionMiddleware': 810,
 }
 
 # Enable or disable extensions
@@ -71,8 +77,8 @@ DOWNLOADER_MIDDLEWARES = {
 # Configure item pipelines
 # See https://doc.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-   'homeland.pipelines.ImagePipeline': 200,
-   'homeland.pipelines.HomelandPipeline': 300,
+    'homeland.pipelines.ImagePipeline': 200,
+    'homeland.pipelines.HomelandPipeline': 300,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
@@ -110,3 +116,6 @@ LOG_STDOUT = True
 
 # 配置 是否启动增量爬取,默认为False
 INCREMENT_CRAWL = True
+
+# Splash服务器地址
+# SPLASH_URL = 'http://localhost:8050'
